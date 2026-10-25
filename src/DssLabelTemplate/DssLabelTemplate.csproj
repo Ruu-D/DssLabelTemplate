@@ -11,7 +11,7 @@
     <RootNamespace>DssLabelTemplate</RootNamespace>
 
     <!-- The version shown at the top right of the window. Change it here (the only place). -->
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
 
     <!-- Sharp on high-DPI screens and on a second monitor with another scaling -->
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>

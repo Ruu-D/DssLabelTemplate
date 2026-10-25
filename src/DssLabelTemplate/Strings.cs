@@ -43,9 +43,7 @@ internal static class Strings
     public const string LanguageEnglish = "English - Engels";
 
     // ---- Row 1: the two files ----
-    public static string FileCaption => T("Labelbestanden", "Fichiers d'étiquettes", "Label files");
-
-    /// <summary>Below the caption: the two kinds of label files of Duivestein (DSS Software Interface, "Label").</summary>
+    /// <summary>Above the path boxes: the two kinds of label files of Duivestein (DSS Software Interface, "Label").</summary>
     public static string FileDescription => T(
         "Labeltemplate + label-csv: het template (xml) beschrijft de opmaak van één label, met variabelen zoals $LENGTH$; de " +
         "label-csv bevat per label één regel met de plaats op de plaat en de gegevens die bij het afdrukken worden ingevuld.\n" +

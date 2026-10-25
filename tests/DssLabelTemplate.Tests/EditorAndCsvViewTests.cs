@@ -171,7 +171,7 @@ public class EditorAndCsvViewTests
             form.OpenLabelFiles(Samples.File(Samples.Template), Samples.File(Samples.Csv));
 
             Assert.True(form.XmlViewButton.Visible && form.CsvViewButton.Visible);
-            Assert.False(form.ShowingCsv); // a new pair starts with the template text
+            Assert.True(form.ShowingCsv); // with a label-csv the table is shown first (Daan, 2026-10-25)
 
             form.CsvViewButton.PerformClick();
             window.Pump();

@@ -30,7 +30,8 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 | Label size fields (length × width in mm, default 100 × 100); objects outside the label are flagged in color red | Done (0.3.0) |
 | Program folder `C:\DssLabelTemplate` with examples; separate file lines for template and CSV; Tab order | Done (0.5.0, checked) |
 | **First release** | **1.0.0** |
-| Print button (reprint on a Zebra ZD220), real QR codes, draggable column divider, new banner text | Built (1.1.0), waiting for a check and a test on the real printer |
+| Print button (reprint on a Zebra ZD220), real QR codes, draggable column divider, new banner text, touch-friendly layout | 1.1.0, customer test version; waiting for a test on the real printer |
+| Window size / position / maximised and column divider remembered; label CSV shown as a table first | Done (1.1.1, published) |
 
 Third-party components: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence) and
 [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence).

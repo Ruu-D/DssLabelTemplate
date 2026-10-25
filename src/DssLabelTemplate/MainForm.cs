@@ -74,7 +74,6 @@ internal class MainForm : Form
     internal readonly Label CreditLabel = new();
     internal readonly Label VersionLabel = new();
     internal readonly PictureBox UserGuidePicture = new();
-    internal readonly Label FileCaption = new();
     internal readonly Label FileDescription = new(); // the two kinds of label files, below the caption
     internal readonly Label XmlFileCaption = new();  // "Template of label-xml:"
     internal readonly TextBox XmlFileBox = new();    // the path of the file in the editor
@@ -229,16 +228,12 @@ internal class MainForm : Form
         AddRow(body, ref row, topRow);
         AddDivider(body, ref row, new Padding(0, 12, 0, 12));
 
-        // Row 1: the label file: the caption, what the two kinds of files are, the path box, and what is open now.
-        FileCaption.AutoSize = true;
-        FileCaption.Margin = new Padding(0, 8, 0, 2);
-        FileCaption.Font = new Font(Font, FontStyle.Bold);
-        AddRow(body, ref row, FileCaption);
-
+        // Row 1: the label files: what the two kinds of files are, the path boxes, and what is open now. (No bold title
+        // "Labelbestanden" above it any more, Daan 2026-10-25: the description says enough.)
         // These two texts get their size from the window (FitFileTexts), never from the table: see TsDssConverter's
         // "layout rules learned the hard way" (a table that wraps a label itself kept rows ten lines high at 125% / 150%).
         FileDescription.AutoSize = false;
-        FileDescription.Margin = new Padding(0, 0, 0, 6);
+        FileDescription.Margin = new Padding(0, 8, 0, 6);
         FileDescription.ForeColor = Theme.Navy;
         AddRow(body, ref row, FileDescription);
 
@@ -629,12 +624,22 @@ internal class MainForm : Form
     }
 
     /// <summary>
-    /// Gives the left column this part of the width (0.5 = equal halves) and the preview the rest. The editor keeps at
-    /// least <see cref="MinimumEditorColumnWidth"/>, the preview <see cref="MinimumColumnWidth"/>; when the window is too
-    /// narrow for both, they share the room in that proportion. The share is put in the settings (saved by the caller,
-    /// when dragging stops).
+    /// The user chose a share (dragging, double-click): it is used, within the minimum widths, and put in the settings
+    /// (saved by the caller, when dragging stops).
     /// </summary>
     internal void SetEditorColumnShare(double share)
+    {
+        _settings.EditorColumnShare = ApplyEditorColumnShare(share);
+    }
+
+    /// <summary>
+    /// Gives the left column this part of the width (0.5 = equal halves) and the preview the rest, and returns the share
+    /// really used. The editor keeps at least <see cref="MinimumEditorColumnWidth"/>, the preview
+    /// <see cref="MinimumColumnWidth"/>; when the window is too narrow for both, they share the room in that proportion.
+    /// It does NOT change the settings: in a window that is (for a moment) too small for the share the user chose, that
+    /// share must stay remembered (until 1.1.0 it was overwritten by the squeezed one at the next start, Daan 2026-10-25).
+    /// </summary>
+    private double ApplyEditorColumnShare(double share)
     {
         int available = ColumnsWidth();
         if (available > 0)
@@ -650,9 +655,9 @@ internal class MainForm : Form
 
         share = Math.Max(AppSettings.MinimumEditorColumnShare, Math.Min(AppSettings.MaximumEditorColumnShare, share));
 
-        _settings.EditorColumnShare = share;
         Workspace.ColumnStyles[0].Width = (float)(share * 100);
         Workspace.ColumnStyles[2].Width = (float)(100 - share * 100);
+        return share;
     }
 
     /// <summary>The width of the two columns together (the workspace without the vertical line).</summary>
@@ -960,7 +965,6 @@ internal class MainForm : Form
         UpdateTitle();
         VersionLabel.Text = Strings.AppVersion(AppInfo.Version);
         _toolTip.SetToolTip(UserGuidePicture, Strings.UserGuideTooltip);
-        FileCaption.Text = Strings.FileCaption;
         FileDescription.Text = Strings.FileDescription;
         XmlFileCaption.Text = Strings.XmlFileCaption;
         CsvFileCaption.Text = Strings.CsvFileCaption;
@@ -1011,7 +1015,7 @@ internal class MainForm : Form
         ShowXmlFile(xmlPath, content!);
         UseCsv(IsLabelXml(content!.Text) ? null : csv);
         RefreshPreview(newFile: true);
-        ShowCsvView(false); // a newly opened pair starts with the template text
+        ShowCsvView(true); // with a label-csv the table is shown first (Daan, 2026-10-25); a label-xml has none: its text
         RememberFiles();
         return true;
     }
@@ -1053,7 +1057,7 @@ internal class MainForm : Form
 
         UseCsv(csv);
         RefreshPreview(newFile: true); // the first label of the new data
-        ShowCsvView(_showingCsv);
+        ShowCsvView(true); // a chosen label-csv is shown as its table (Daan, 2026-10-25); closed (null): the template text
         RememberFiles();
         return true;
     }
@@ -1503,8 +1507,60 @@ internal class MainForm : Form
     protected override void OnLoad(EventArgs e)
     {
         base.OnLoad(e); // the scaling of the whole window has been applied by now
-        FitToArea(Screen.FromControl(this).WorkingArea);
-        SetEditorColumnShare(_settings.EditorColumnShare); // the share of the last time, within the minimum widths of now
+        RestoreWindowPlace();
+
+        // The column share of the last time, within the minimum widths of the window as it is now; again every time the
+        // window changes size (e.g. maximised again), so the share the user chose comes back when there is room for it.
+        ApplyEditorColumnShare(_settings.EditorColumnShare);
+        Workspace.SizeChanged += (sender, args) => ApplyEditorColumnShare(_settings.EditorColumnShare);
+    }
+
+    /// <summary>
+    /// The window opens where it was closed last time, with the same size, maximised if it was (Daan, 2026-10-25). The
+    /// first time, or when that place is not on any screen any more (a monitor was removed): the standard size in the
+    /// middle of the screen.
+    /// </summary>
+    private void RestoreWindowPlace()
+    {
+        var titleBar = new Rectangle(_settings.WindowLeft, _settings.WindowTop, LogicalToDeviceUnits(200), LogicalToDeviceUnits(30));
+        bool known = _settings.WindowWidth > 0 && Screen.AllScreens.Any(screen => screen.WorkingArea.IntersectsWith(titleBar));
+        if (!known)
+        {
+            FitToArea(Screen.FromControl(this).WorkingArea);
+        }
+        else
+        {
+            // First the place, then the size: on a monitor with another scaling Windows scales the window when it arrives
+            // there, so the size (saved at 100%) is converted with the scaling of THAT monitor.
+            Location = new Point(_settings.WindowLeft, _settings.WindowTop);
+            Size = new Size(LogicalToDeviceUnits(_settings.WindowWidth), LogicalToDeviceUnits(_settings.WindowHeight));
+
+            Rectangle area = Screen.FromControl(this).WorkingArea;
+            if (Width > area.Width || Height > area.Height)
+            {
+                FitToArea(area); // a window bigger than this screen (it was on a bigger one): fit it in
+            }
+        }
+
+        if (_settings.WindowMaximized)
+        {
+            WindowState = FormWindowState.Maximized;
+        }
+    }
+
+    /// <summary>
+    /// Remembers the place of the window for the next start (<see cref="RestoreWindowPlace"/>). When it is maximised (or
+    /// minimised), the place and size of the normal window are remembered, so un-maximising later goes back there.
+    /// </summary>
+    private void RememberWindowPlace()
+    {
+        Rectangle normal = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
+        _settings.WindowMaximized = WindowState == FormWindowState.Maximized;
+        _settings.WindowLeft = normal.Left;
+        _settings.WindowTop = normal.Top;
+        _settings.WindowWidth = (int)Math.Round(normal.Width * 96.0 / DeviceDpi);  // at 100%: right for any monitor
+        _settings.WindowHeight = (int)Math.Round(normal.Height * 96.0 / DeviceDpi);
+        TrySaveSettings();
     }
 
     protected override void OnShown(EventArgs e)
@@ -1534,6 +1590,10 @@ internal class MainForm : Form
         if (e.CloseReason == CloseReason.UserClosing && !ConfirmLeavingChanges())
         {
             e.Cancel = true;
+        }
+        else
+        {
+            RememberWindowPlace();
         }
 
         base.OnFormClosing(e);

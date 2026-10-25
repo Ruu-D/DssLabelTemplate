@@ -271,11 +271,122 @@ public class MainFormTests
                 Assert.InRange(editor / (double)(editor + preview), 0.56, 0.60);
             }
 
-            // A share from a wider window (or from a hand-edited file) that would squeeze the preview: the minimum wins.
-            using (var window = new Window(new AppSettings { EditorColumnShare = 0.9 }))
+            // A share from a wider (maximised) window that would squeeze the preview in the standard window: the minimum
+            // wins on screen, but the share the user chose stays remembered, also after opening files (which saves the
+            // settings), and comes back when the window is big enough again.
+            using (var window = new Window(new AppSettings { EditorColumnShare = 0.8 }))
             {
-                Assert.True(window.Form.Preview.Width >= 330, "preview " + window.Form.Preview.Width);
+                MainForm form = window.Form;
+                Assert.True(form.Preview.Width >= 330, "preview " + form.Preview.Width);
+
+                form.OpenLabelFiles(Samples.File(Samples.LabelXml), null);
+                window.Pump();
+                Assert.Equal(0.8, window.Settings.EditorColumnShare);
+
+                form.Width = 2400; // room for 80 / 20 now
+                window.Pump();
+                int editor = form.Editor.Parent!.Width, preview = form.Preview.Width;
+                Assert.InRange(editor / (double)(editor + preview), 0.78, 0.82);
             }
+        });
+    }
+
+    // ---------------------------------------------------------------- the place of the window
+
+    [Fact]
+    public void TheWindow_OpensWhereItWasClosed_WithTheSameSize()
+    {
+        Sta.Run(() =>
+        {
+            Rectangle area = Screen.PrimaryScreen!.WorkingArea;
+            var settings = new AppSettings { WindowLeft = area.Left + 40, WindowTop = area.Top + 30, WindowWidth = 900, WindowHeight = 640 };
+            using var window = new Window(settings);
+            MainForm form = window.Form;
+
+            Assert.Equal(new Point(area.Left + 40, area.Top + 30), form.Location);
+            Assert.Equal(new Size(900, 640), form.Size); // the test process runs at 100%
+            Assert.Equal(FormWindowState.Normal, form.WindowState);
+
+            // Moved and made bigger, then closed: remembered for the next start.
+            form.Bounds = new Rectangle(area.Left + 60, area.Top + 50, 1000, 700);
+            int saves = window.SaveCount;
+            form.Close();
+
+            Assert.True(window.SaveCount > saves);
+            Assert.Equal((area.Left + 60, area.Top + 50, 1000, 700, false),
+                (settings.WindowLeft, settings.WindowTop, settings.WindowWidth, settings.WindowHeight, settings.WindowMaximized));
+        });
+    }
+
+    [Fact]
+    public void AMaximisedWindow_OpensMaximisedAgain_AndRemembersItsNormalSize()
+    {
+        Sta.Run(() =>
+        {
+            Rectangle area = Screen.PrimaryScreen!.WorkingArea;
+            var settings = new AppSettings { WindowLeft = area.Left + 40, WindowTop = area.Top + 30, WindowWidth = 900, WindowHeight = 640, WindowMaximized = true };
+            using var window = new Window(settings);
+
+            Assert.Equal(FormWindowState.Maximized, window.Form.WindowState);
+
+            window.Form.Close();
+
+            Assert.True(settings.WindowMaximized);
+            Assert.Equal((900, 640), (settings.WindowWidth, settings.WindowHeight)); // the size to go back to
+        });
+    }
+
+    [Fact]
+    public void APlaceThatIsOnNoScreen_OrNoPlaceAtAll_GivesTheStandardWindowInTheMiddleOfTheScreen()
+    {
+        Sta.Run(() =>
+        {
+            using var standard = new Window(); // never saved: the standard size
+            Size standardSize = standard.Form.Size;
+            Rectangle area = Screen.FromControl(standard.Form).WorkingArea;
+            Assert.True(area.Contains(standard.Form.Bounds));
+
+            // A monitor that was removed: the saved place is far outside every screen.
+            using var gone = new Window(new AppSettings { WindowLeft = -50000, WindowTop = -50000, WindowWidth = 1200, WindowHeight = 800 });
+            Assert.Equal(standardSize, gone.Form.Size);
+            Assert.True(Screen.FromControl(gone.Form).WorkingArea.Contains(gone.Form.Bounds));
+        });
+    }
+
+    // ---------------------------------------------------------------- the view of the left column, the top of row 1
+
+    [Fact]
+    public void ChoosingALabelCsv_ShowsItsTable_ClosingItShowsTheTemplateText()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+            form.OpenXmlFile(Samples.File(Samples.Template));
+            Assert.False(form.ShowingCsv); // a template without data: its text
+
+            form.OpenCsvFile(Samples.File(Samples.Csv));
+            Assert.True(form.ShowingCsv);
+
+            form.OpenCsvFile(null);
+            Assert.False(form.ShowingCsv);
+        });
+    }
+
+    [Fact]
+    public void Row1_StartsWithTheDescription_ThereIsNoBoldTitleAboveIt()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+
+            // Between the divider under the language and the description there is nothing else.
+            Panel firstDivider = form.Dividers[0];
+            int belowDivider = Top(firstDivider) + firstDivider.Height;
+            Assert.InRange(Top(form.FileDescription) - belowDivider, 0, 30);
+            Assert.DoesNotContain(form.FileDescription.Parent!.Controls.OfType<Label>(),
+                label => label != form.FileDescription && Top(label) < Top(form.FileDescription) && Top(label) > belowDivider);
         });
     }
 
@@ -388,7 +499,6 @@ public class MainFormTests
             window.Form.LanguageBox.SelectedIndex = (int)AppLanguage.English;
 
             Assert.Equal("Save template", window.Form.SaveButton.Text);
-            Assert.Equal("Label files", window.Form.FileCaption.Text);
             Assert.Equal(Strings.FileDescription, window.Form.FileDescription.Text);
             Assert.Equal(Strings.StatusNothingOpen, window.Form.FileStatus.Text);
             Assert.Equal("en", window.Settings.Language);

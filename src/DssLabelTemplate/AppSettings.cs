@@ -41,6 +41,18 @@ internal class AppSettings
     public const double MaximumEditorColumnShare = 0.9;
 
     public static bool IsValidEditorColumnShare(double share) => share >= MinimumEditorColumnShare && share <= MaximumEditorColumnShare;
+
+    /// <summary>
+    /// Where the window was when the program was closed last time (Daan, 2026-10-25), used again at the next start:
+    /// the top left corner in screen pixels, the size at 100% (so it fits a monitor with another scaling too), and whether
+    /// it was maximised. When maximised, the place and size are those of the normal window (to go back to).
+    /// WindowWidth 0 = never saved: the standard size, in the middle of the screen.
+    /// </summary>
+    public int WindowLeft { get; set; }
+    public int WindowTop { get; set; }
+    public int WindowWidth { get; set; }
+    public int WindowHeight { get; set; }
+    public bool WindowMaximized { get; set; }
 }
 
 /// <summary>Reads and writes settings.json. Never throws on reading: a missing or broken file gives the defaults.</summary>
@@ -69,6 +81,13 @@ internal static class SettingsStore
             settings.LastFile ??= "";
             settings.LastCsvFile ??= "";
             settings.PrinterName ??= "";
+
+            // A window size edited by hand into something impossible: forget the place (standard size, in the middle).
+            if (settings.WindowWidth <= 0 || settings.WindowHeight <= 0)
+            {
+                settings.WindowWidth = 0;
+                settings.WindowHeight = 0;
+            }
 
             // A column share edited by hand into something impossible: back to two equal halves.
             if (!AppSettings.IsValidEditorColumnShare(settings.EditorColumnShare))

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.1.1 — 2026-10-25 (after Daan's test of 1.1.0)
+
+- **The window's place is remembered:** position, size (stored at 100%, so it fits a monitor with another scaling) and
+  maximised, in `settings.json` (`WindowLeft`, `WindowTop`, `WindowWidth`, `WindowHeight`, `WindowMaximized`). A place
+  that is on no screen any more gives the standard window in the middle of the screen.
+- **The column share is no longer lost:** in 1.1.0 a share chosen in a maximised window was squeezed to fit the standard
+  window at the next start and that squeezed value was then saved (opening the last files saves the settings). Now only
+  dragging changes the remembered share; a window that is too small uses a squeezed share without saving it, and the
+  chosen share comes back as soon as there is room.
+- **A label CSV is shown as its table first** (opening a pair or choosing a csv); closing the csv shows the text again.
+- **The bold title "Labelbestanden" above the description is gone** (the description stays).
+- 143 tests. The window place checked at a real 150%.
+- **Delivery:** `dist\v1.1.1\DssLabelTemplate.exe`, 53,202,577 bytes, file version 1.1.1.0, SHA-256
+  `840500501d6c80e9f98f27a4006a903742b52589634e2e137e0fb1372ba62905`. Started once with `--data` on an empty folder and
+  closed normally: it wrote the examples and saved its window place in settings.json.
+
 ## 1.1.0 — 2026-10-25 (step 6: printing; waiting for Daan's check)
 
 - **Print button** (Daan: a reprint station for damaged labels, a Zebra ZD220 via USB, direct thermal, peel-off, next to
