@@ -1,14 +1,13 @@
 # DssLabelTemplate
 
 A small Windows tool to **visualize and manually edit label files for a Duivestein system**.
-Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (which writes the label CSV files for the Duivestein warehouse); it uses the same look.
+Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (which writes the label CSV files for the Duivestein warehouse).
 
 - **One single `.exe`**, no installer, no .NET installation needed, no Excel/Office.
 - Opens the two kinds of Duivestein label files (DSS Software Interface v1.7):
   - a **label CSV + label template**: the CSV has one line per label (its place on the sheet and its data); the template
     (XML) describes the layout of one label with variables like `$LENGTH$` that are filled in from each CSV line;
   - a **label XML**: one file per sheet with the layout and the data of all its labels.
-- Two file lines: the template or label XML (shown in the editor) and, for a template, the label CSV with the data.
 - Left: the XML in a coloured editor with line numbers (Scintilla, the editor of Notepad++), or the data of the label CSV
   as a table. Right: a preview of one label, updated while typing, with arrows to go through all labels, where the label
   sits on the sheet, and a small map of the sheet.
