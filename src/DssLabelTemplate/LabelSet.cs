@@ -77,6 +77,15 @@ internal class LabelVariables
         return Variable.Replace(text, match => Lookup(match.Groups[1].Value) ?? match.Value);
     }
 
+    /// <summary>True when these values come from a csv line (a template with its label-csv).</summary>
+    public bool HasCsvLine => _row != null;
+
+    /// <summary>The names of the variables in the text that have no value: not a column of the csv (nor DATE / TIME).</summary>
+    public IEnumerable<string> Unknown(string text)
+    {
+        return Variable.Matches(text).Select(match => match.Groups[1].Value).Where(name => Lookup(name) == null);
+    }
+
     private string? Lookup(string name)
     {
         if (_row != null && _row.TryGetValue(name, out string? value))
@@ -115,6 +124,13 @@ internal class LabelItem
     /// <summary>The csv line this label was made from (0 = the first line after the header); null for a label-xml.</summary>
     public int? CsvRow { get; }
 
+    /// <summary>
+    /// The variables of the template that are not a column of the label-csv, e.g. "XPOS" when the template says
+    /// X="$XPOS$" but the csv of TsDssConverter calls that column X. Empty without a csv (then every variable is empty).
+    /// The preview names them, instead of only showing "X ?".
+    /// </summary>
+    public List<string> MissingVariables { get; } = new();
+
     public LabelItem(XElement printLabel, XElement printJob, LabelVariables variables, int? csvRow = null)
     {
         Element = printLabel;
@@ -127,6 +143,16 @@ internal class LabelItem
         Rotation = Number(Value(printLabel, "Rotation")) is double rotation ? (int)Math.Round(rotation) : 0;
         SheetLength = Number(Value(printJob, "Length"));
         SheetWidth = Number(Value(printJob, "Width"));
+
+        if (variables.HasCsvLine)
+        {
+            // Every place a variable can be: the sheet size, the place of the label, and every print object (its
+            // attributes and its text), in the order of the file.
+            IEnumerable<string> texts = printJob.Attributes().Select(attribute => attribute.Value)
+                .Concat(printLabel.DescendantsAndSelf().SelectMany(element => element.Attributes()).Select(attribute => attribute.Value))
+                .Concat(printLabel.DescendantNodes().OfType<XText>().Select(text => text.Value));
+            MissingVariables.AddRange(texts.SelectMany(variables.Unknown).Distinct(StringComparer.OrdinalIgnoreCase));
+        }
     }
 
     /// <summary>The value of an attribute with the variables filled in, or null if the attribute is not there.</summary>

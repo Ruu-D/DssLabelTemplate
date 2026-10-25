@@ -18,7 +18,7 @@ internal static class Strings
     public const string UserGuideUrl = "https://github.com/Ruu-D/DssLabelTemplate/"; // opened by the user-guide icon: the GitHub page of this tool
 
     /// <summary>The line below the program name in the banner. English in every language, like the banner of TsDssConverter.</summary>
-    public const string BannerSubtitle = "Visualize and manually edit label files for a Duivestein system";
+    public const string BannerSubtitle = "Visualize, edit and print label files for DUIVESTEIN";
 
     /// <summary>The two arrows next to the preview title (pictures, the same in every language).</summary>
     public const string PreviousArrow = "◀";
@@ -138,6 +138,18 @@ internal static class Strings
     public static string PreviousLabel => T("Vorig label", "Étiquette précédente", "Previous label");
     public static string NextLabel => T("Volgend label", "Étiquette suivante", "Next label");
 
+    /// <summary>The tooltip of the print button right of the arrows.</summary>
+    public static string PrintTooltip => T(
+        "Label(s) afdrukken… (Ctrl+P)",
+        "Imprimer l'étiquette / les étiquettes… (Ctrl+P)",
+        "Print label(s)… (Ctrl+P)");
+
+    /// <summary>The tooltip of the vertical line between the two columns.</summary>
+    public static string ColumnDividerTooltip => T(
+        "Sleep om de kolommen breder of smaller te maken; dubbelklik voor twee gelijke helften",
+        "Faites glisser pour élargir ou réduire les colonnes ; double-clic pour deux moitiés égales",
+        "Drag to make the columns wider or narrower; double-click for two equal halves");
+
     public static string PreviewNoFile => T(
         "Kies hierboven een labeltemplate (met zijn label-csv) of een label-xml.",
         "Choisissez ci-dessus un modèle d'étiquette (avec son csv) ou un xml d'étiquettes.",
@@ -185,14 +197,20 @@ internal static class Strings
         $"{count} objet(s) non dessiné(s) (nombre manquant ou invalide), p. ex. {first}",
         $"{count} object(s) not drawn (missing or invalid number), e.g. {first}");
 
+    /// <summary>Below the label: variables of the template that are not a column of the label-csv, e.g. "$XPOS$, $YPOS$".</summary>
+    public static string VariablesNotInCsv(string names) => T(
+        $"Niet in de label-csv: {names} (pas de kolomnaam in het template aan)",
+        $"Absent du csv d'étiquettes : {names} (adaptez le nom de colonne dans le modèle)",
+        $"Not in the label CSV: {names} (change the column name in the template)");
+
     public static string ObjectsOutsideLabel(int count) => T(
         $"{count} object(en) vallen (deels) buiten het label",
         $"{count} objet(s) (en partie) hors de l'étiquette",
         $"{count} object(s) (partly) outside the label");
 
-    // ---- Footer ----
-    public static string Save => T("Opslaan", "Enregistrer", "Save");
-    public static string Close => T("Sluiten", "Fermer", "Close");
+    // ---- Saving ----
+    /// <summary>The blue button above the editor, only shown when the text was changed.</summary>
+    public static string SaveTemplate => T("Template opslaan", "Enregistrer le modèle", "Save template");
 
     // ---- Questions and messages ----
     /// <summary>The name used for a text that was not saved to a file yet.</summary>
@@ -227,6 +245,20 @@ internal static class Strings
         $"De instellingen konden niet worden opgeslagen: {reason}",
         $"Les paramètres n'ont pas pu être enregistrés : {reason}",
         $"The settings could not be saved: {reason}");
+
+    /// <summary>Before printing: the page of the printer driver is not the label size of the window.</summary>
+    public static string PaperSizeQuestion(string printer, string paperLength, string paperWidth, string labelLength, string labelWidth) => T(
+        $"Het papier van printer {printer} is {paperLength} × {paperWidth} mm, het label is {labelLength} × {labelWidth} mm. " +
+        "Stel het papierformaat in bij de printer (Windows-instellingen) of pas het labelformaat aan.\n\nToch afdrukken?",
+        $"Le papier de l'imprimante {printer} mesure {paperLength} × {paperWidth} mm, l'étiquette {labelLength} × {labelWidth} mm. " +
+        "Réglez le format du papier de l'imprimante (paramètres Windows) ou adaptez le format d'étiquette.\n\nImprimer quand même ?",
+        $"The paper of printer {printer} is {paperLength} × {paperWidth} mm, the label is {labelLength} × {labelWidth} mm. " +
+        "Set the paper size of the printer (Windows settings) or change the label size.\n\nPrint anyway?");
+
+    public static string CannotPrint(string reason) => T(
+        $"Er kon niet worden afgedrukt: {reason}",
+        $"L'impression a échoué : {reason}",
+        $"Could not print: {reason}");
 
     public static string CannotOpenLink(string reason) => T(
         $"De website kon niet worden geopend: {reason}",

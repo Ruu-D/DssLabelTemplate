@@ -26,6 +26,21 @@ internal class AppSettings
     public const double MaximumLabelSize = 1000;
 
     public static bool IsValidLabelSize(double millimetres) => millimetres >= MinimumLabelSize && millimetres <= MaximumLabelSize;
+
+    /// <summary>The printer of the last print (chosen in the print dialog); the dialog starts with it. Empty = Windows' default printer.</summary>
+    public string PrinterName { get; set; } = "";
+
+    /// <summary>
+    /// The part of the width that the LEFT column (the editor) gets; the preview gets the rest. Set by dragging the vertical
+    /// line between them. 0.5 = two equal halves.
+    /// </summary>
+    public double EditorColumnShare { get; set; } = DefaultEditorColumnShare;
+
+    public const double DefaultEditorColumnShare = 0.5;
+    public const double MinimumEditorColumnShare = 0.1;
+    public const double MaximumEditorColumnShare = 0.9;
+
+    public static bool IsValidEditorColumnShare(double share) => share >= MinimumEditorColumnShare && share <= MaximumEditorColumnShare;
 }
 
 /// <summary>Reads and writes settings.json. Never throws on reading: a missing or broken file gives the defaults.</summary>
@@ -53,6 +68,13 @@ internal static class SettingsStore
             settings.Language ??= "nl";
             settings.LastFile ??= "";
             settings.LastCsvFile ??= "";
+            settings.PrinterName ??= "";
+
+            // A column share edited by hand into something impossible: back to two equal halves.
+            if (!AppSettings.IsValidEditorColumnShare(settings.EditorColumnShare))
+            {
+                settings.EditorColumnShare = AppSettings.DefaultEditorColumnShare;
+            }
 
             // A size edited by hand into something impossible: back to 100 mm.
             if (!AppSettings.IsValidLabelSize(settings.LabelLength))

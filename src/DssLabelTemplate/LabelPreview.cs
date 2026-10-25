@@ -163,7 +163,13 @@ internal class LabelPreview : Control
 
         DrawLine(g, new Rectangle(inside.Left, top, inside.Width, line), info, Theme.Navy);
         var problemLine = new Rectangle(inside.Left, top + line, inside.Width, line);
-        if (Problems.Count > 0)
+        if (label.MissingVariables.Count > 0)
+        {
+            // First: it is usually the cause of the other problems (a "?" above, an object that cannot be drawn).
+            string names = string.Join(", ", label.MissingVariables.Select(name => "$" + name + "$"));
+            DrawLine(g, problemLine, Strings.VariablesNotInCsv(names), Theme.Error);
+        }
+        else if (Problems.Count > 0)
         {
             DrawLine(g, problemLine, Strings.ObjectsNotDrawn(Problems.Count, Problems[0]), Theme.Error);
         }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<DSSPrintJob Length="$LENGTH$" Width="$WIDTH$">
-  <PrintLabel ID="$ID$" X="$XPOS$" Y="$YPOS$" ROTATION="$ROTATION$">
+<DSSPrintJob Length="$SHEETLENGTH$" Width="$SHEETWIDTH$">
+  <PrintLabel ID="$ID$" X="$X$" Y="$Y$" ROTATION="$ROTATION$">
     <Line X="10" Y="10" X2="90" Y2="10"/>
     <Line X="90" Y="10" X2="90" Y2="90"/>
     <Line X="10" Y="10" X2="10" Y2="90"/>
@@ -10,9 +10,9 @@
     <Text X="12" Y="18" FontSize="10" >PIECE:</Text>
     <Text X="29" Y="18" FontSize="10" Style="BOLD">$DESCRIPTION$</Text>
     <Text X="12" Y="27" FontSize="10" >DIM.:</Text>
-    <Text X="24" Y="27" FontSize="10" >$X$</Text>
+    <Text X="24" Y="27" FontSize="10" >$PANELLENGTH$</Text>
     <Text X="38" Y="27" FontSize="10" >x</Text>
-    <Text X="48" Y="27" FontSize="10" >$Y$</Text>
+    <Text X="48" Y="27" FontSize="10" >$PANELWIDTH$</Text>
     <Text X="12" Y="37" FontSize="10" >MATIERE:</Text>
     <Text X="32" Y="37" Style="BOLD">$MATERIAL$</Text>
     <Text X="12" Y="50" FontSize="10" >REMARQUE:</Text>

@@ -12,7 +12,12 @@ The pictures they refer to (C:\DSS\DUIVESTEIN.png, C:\DSS\DUIVESTEIN-LOGO.bmp) a
 the preview draws a placeholder with the file name.
 
 HUPPY-PINCKAERS-60x60.xml, HUPPY-PINCKAERS-100x100.xml
-                     Daan's own label templates (60 x 60 mm and 100 x 100 mm labels), not from the PDF.
+                     Daan's own label templates (60 x 60 mm and 100 x 100 mm labels), not from the PDF. They use the
+                     column names of TsDssConverter's label CSV: X, Y, SHEETLENGTH, SHEETWIDTH, PANELLENGTH, … (until
+                     2026-10-25 they still had XPOS, YPOS, LENGTH, WIDTH of the PDF example, so X and Y stayed empty).
+DAAN_ROGIERS-P2026.09_001.csv
+                     A label CSV of TsDssConverter (its expected output for its own sample, 13 labels): the data for
+                     the HUPPY-PINCKAERS templates.
 
 Every *.xml and *.csv in this folder is also built into DssLabelTemplate.exe and written to C:\DssLabelTemplate\labels and
 C:\DssLabelTemplate\CSV examples at the first start (only when that folder does not exist yet).

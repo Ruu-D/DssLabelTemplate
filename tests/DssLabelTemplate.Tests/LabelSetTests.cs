@@ -25,6 +25,46 @@ public class LabelSetTests
         Assert.Equal(2070, set.Labels[0].SheetWidth);
     }
 
+    [Theory]
+    [InlineData("HUPPY-PINCKAERS-60x60.xml")]
+    [InlineData("HUPPY-PINCKAERS-100x100.xml")]
+    public void DaansTemplates_WithTheCsvOfTsDssConverter_KnowEveryVariable_AndThePlaceOnTheSheet(string template)
+    {
+        // DAAN_ROGIERS-P2026.09_001.csv = TsDssConverter's expected output for its sample (columns X, Y, SHEETLENGTH, …).
+        LabelSet set = LabelSetBuilder.Build(Samples.Text(template), LabelCsv.Read(Samples.File("DAAN_ROGIERS-P2026.09_001.csv")), Now);
+
+        Assert.Null(set.Error);
+        Assert.Equal(13, set.Labels.Count);
+        Assert.All(set.Labels, label => Assert.Empty(label.MissingVariables));
+        LabelItem first = set.Labels[0]; // K1 - Front - 3575 on Melamine_18#01
+        Assert.Equal("3575", first.Id);
+        Assert.Equal(399, first.X);
+        Assert.Equal(540, first.Y);
+        Assert.Equal(180, first.Rotation);
+        Assert.Equal(2850, first.SheetLength);
+        Assert.Equal(2100, first.SheetWidth);
+    }
+
+    [Fact]
+    public void AVariableThatIsNotACsvColumn_IsNamed_OnceAndInTheOrderOfTheFile()
+    {
+        // The column names of Duivestein's example (XPOS, YPOS, LENGTH, WIDTH) with a csv of TsDssConverter (X, Y, …):
+        // the place on the sheet cannot be known, and the label says which variables are missing.
+        const string template =
+            "<DSSPrintJob Length=\"$LENGTH$\" Width=\"$WIDTH$\"><PrintLabel ID=\"$ID$\" X=\"$XPOS$\" Y=\"$YPOS$\">" +
+            "<Text X=\"1\" Y=\"1\">$DESCRIPTION$ $XPOS$ $DATE$</Text></PrintLabel></DSSPrintJob>";
+        LabelCsv csv = LabelCsv.Parse("ID\tX\tY\tDESCRIPTION\n7\t399\t540\tFront\n", "tsdss.csv");
+
+        LabelItem label = LabelSetBuilder.Build(template, csv, Now).Labels.Single();
+
+        Assert.Equal(new[] { "LENGTH", "WIDTH", "XPOS", "YPOS" }, label.MissingVariables); // $DATE$ is known
+        Assert.Null(label.X);
+        Assert.Equal("7", label.Id);
+
+        // Without a csv nothing is "missing": every variable is empty then, and the status line already says so.
+        Assert.Empty(LabelSetBuilder.Build(template, null, Now).Labels.Single().MissingVariables);
+    }
+
     [Fact]
     public void TheVariablesOfATemplate_AreFilledInFromTheCsvLine()
     {

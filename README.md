@@ -1,6 +1,6 @@
-<h1 align="center"><img src="media/header.png" width="540" alt="DssLabelTemplate - Visualize and manually edit label files for a Duivestein system"></h1>
+<h1 align="center"><img src="media/header.png" width="540" alt="DssLabelTemplate - Visualize, edit and print label files for DUIVESTEIN"></h1>
 
-A small Windows tool to **visualize and manually edit label files for a Duivestein system**.
+A small Windows tool to **visualize, edit and print label files for a Duivestein system**.
 Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (which writes the label CSV files for the Duivestein warehouse).
 
 - **One single `.exe`**, no installer, no .NET installation needed, no Excel/Office.
@@ -10,7 +10,11 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
   - a **label XML**: one file per sheet with the layout and the data of all its labels.
 - Left: the XML in a coloured editor with line numbers (Scintilla, the editor of Notepad++), or the data of the label CSV
   as a table. Right: a preview of one label, updated while typing, with arrows to go through all labels, where the label
-  sits on the sheet, and a small map of the sheet.
+  sits on the sheet, and a small map of the sheet. The line between the two columns can be dragged.
+- **Printing** on any Windows printer, meant for a label printer at the unloading belt (Zebra ZD220) to **reprint a
+  damaged label**: the shown label, a range or all labels, one label per page, with real scannable QR codes and barcodes
+  whose bars fall on whole printer dots. The automatic printing on the label station stays with Duivestein's
+  DSSPrintServer.
 - Dutch, French and English interface. Files are saved back in their own encoding and line endings.
 - Installed by copying the exe to `C:\DssLabelTemplate`. That folder also holds `settings.json` and, from the first start,
   the example files in `labels\` and `CSV examples\`.
@@ -26,19 +30,25 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 | Label size fields (length × width in mm, default 100 × 100); objects outside the label are flagged in color red | Done (0.3.0) |
 | Program folder `C:\DssLabelTemplate` with examples; separate file lines for template and CSV; Tab order | Done (0.5.0, checked) |
 | **First release** | **1.0.0** |
+| Print button (reprint on a Zebra ZD220), real QR codes, draggable column divider, new banner text | Built (1.1.0), waiting for a check and a test on the real printer |
 
-Third-party component: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence).
+Third-party components: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence) and
+[QRCoder](https://github.com/Shane32/QRCoder) (MIT licence).
 
 ## Remarks
 
 1. The preview follows Duivestein's manual. The label size is not in the label files, so it is set in the window.
 2. The preview assumes (to be checked on a printed label): rotation counter-clockwise, text positioned by
 its top-left corner.
-3. Barcodes and QR codes are drawn to show place and size; they are not meant to be scanned.
+3. QR codes are real and scannable. Barcodes are always printed as Code 128, whatever type the template names (EAN,
+   Code 39, … are not built in).
+4. The printer's paper size is set in the printer driver (Windows settings) to the label size; the program warns when
+   it does not match the label size in the window.
 
 ## Open questions
 
 1. The real label size (mm) and a printed label to compare the preview with. Real-life printed labels can also determine if the label preview is rendered correctly.
 2. Real templates, to be copied from a working Duivestein system later.
+3. A test print on the Zebra ZD220: position, sharpness, and scanning the QR code and barcode with the real scanner.
 
 Developer: Daan Verhoost — ROGIERS NV/SA.

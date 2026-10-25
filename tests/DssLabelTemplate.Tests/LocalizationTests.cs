@@ -14,14 +14,14 @@ public class LocalizationTests
     }
 
     [Theory]
-    [InlineData(AppLanguage.Dutch, "Opslaan")]
-    [InlineData(AppLanguage.French, "Enregistrer")]
-    [InlineData(AppLanguage.English, "Save")]
+    [InlineData(AppLanguage.Dutch, "Template opslaan")]
+    [InlineData(AppLanguage.French, "Enregistrer le modèle")]
+    [InlineData(AppLanguage.English, "Save template")]
     public void T_GivesTheTextOfTheSelectedLanguage(AppLanguage language, string expected)
     {
         using var scope = new LanguageScope(language);
 
-        Assert.Equal(expected, Strings.Save);
+        Assert.Equal(expected, Strings.SaveTemplate);
     }
 
     [Fact]

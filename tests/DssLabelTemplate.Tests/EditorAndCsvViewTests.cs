@@ -237,7 +237,7 @@ public class EditorAndCsvViewTests
             }
 
             Assert.Equal(form.CsvViewButton.Height, form.EditorHeader.Height);
-            Assert.Equal(form.EditorHeader.Height, form.PreviewHeader.Height);
+            Assert.Equal(form.EditorHeader.Height, form.PreviewHeader.Height); // the label size fields are as high as a button
         });
     }
 

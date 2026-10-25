@@ -51,7 +51,7 @@ internal static class AppIcons
     }
 
     /// <summary>
-    /// The small logo of ROGIERS for the footer. The picture file has a transparent margin around the logo; that is
+    /// The small logo of ROGIERS at the bottom left of the window. The picture file has a transparent margin around the logo; that is
     /// cut off, so the logo itself lines up with the other controls. It is made smaller once, with high quality:
     /// the window then only scales a small picture (a big picture scaled down by a PictureBox looks jagged).
     /// </summary>
@@ -67,6 +67,15 @@ internal static class AppIcons
     public static Image UserGuide()
     {
         return TrimmedAndScaled("user-guide.png", 64);
+    }
+
+    /// <summary>
+    /// The printer icon on the print button next to the arrows (media\Print.png, navy on transparent). Made smaller once
+    /// like the other icons: shown 18 pixels high at 100%, so 72 is enough for a screen at 400%.
+    /// </summary>
+    public static Image Print()
+    {
+        return TrimmedAndScaled("print.png", 72);
     }
 
     /// <summary>A built-in picture without its transparent margin, made smaller once (high quality) to the given long side.</summary>

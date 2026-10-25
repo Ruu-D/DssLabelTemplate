@@ -11,7 +11,7 @@
     <RootNamespace>DssLabelTemplate</RootNamespace>
 
     <!-- The version shown at the top right of the window. Change it here (the only place). -->
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
 
     <!-- Sharp on high-DPI screens and on a second monitor with another scaling -->
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
@@ -25,6 +25,7 @@
     <EmbeddedResource Include="..\..\media\app.ico" LogicalName="app.ico" />
     <EmbeddedResource Include="..\..\media\ROGIERS-transp-small.png" LogicalName="rogiers-logo.png" />
     <EmbeddedResource Include="..\..\media\user-guide.png" LogicalName="user-guide.png" />
+    <EmbeddedResource Include="..\..\media\Print.png" LogicalName="print.png" />
   </ItemGroup>
 
   <!-- The example label files, written to C:\DssLabelTemplate\labels and \CSV examples at the first start (AppDataFolder.cs).
@@ -49,6 +50,12 @@
     <PackageReference Include="Scintilla5.NET" Version="7.1.1" GeneratePathProperty="true" />
     <EmbeddedResource Include="$(PkgScintilla5_NET)\runtimes\win-x64\native\Scintilla.dll" LogicalName="native/Scintilla.dll" />
     <EmbeddedResource Include="$(PkgScintilla5_NET)\runtimes\win-x64\native\Lexilla.dll" LogicalName="native/Lexilla.dll" />
+  </ItemGroup>
+
+  <!-- Real, scannable QR codes on the preview and on the printed label: QRCoder, MIT licence, approved by Daan on
+       2026-10-25. Pinned to 1.6.0 (a long-established version; 1.8.1 was only days old). Pure managed code. -->
+  <ItemGroup>
+    <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
 
   <!-- The package also copies its native files as loose files (runtimes\..., and for a win-x64 publish straight next to

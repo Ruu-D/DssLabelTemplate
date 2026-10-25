@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.1.0 — 2026-10-25 (step 6: printing; waiting for Daan's check)
+
+- **Print button** (Daan: a reprint station for damaged labels, a Zebra ZD220 via USB, direct thermal, peel-off, next to
+  the unloading belt): right of the ▶ arrow, the same size as the arrows, with the printer icon `media\Print.png`
+  (Daan's picture, built into the exe, `AppIcons.Print`). Also Ctrl+P. It opens the Windows print dialog with the printer
+  of the last time (`settings.json` → `PrinterName`) and "current page" = the label in the preview; "pages" are the label
+  numbers, so all labels or a range can be printed too. One label per page, 1 to 1 in mm from the top left corner of the
+  paper, drawn by the same `LabelRenderer` as the preview (`LabelPrinter.cs`). The page size comes from the printer driver
+  (set up for the label on the reprint PC); when it differs more than 1 mm from the label size of the window, the
+  program asks before printing. The button is shown as soon as there is a label (also just one).
+- **Real QR codes** with **QRCoder** (NuGet, MIT, approved by Daan; pinned to 1.6.0 because 1.8.1 was only 12 days old):
+  in the preview and on paper (`QrCode.cs`, error correction M, no white border: the template places the code).
+- **Printer dots:** on the printer, barcode bars and QR squares are a whole number of printer dots and start on a dot
+  (a 203 dpi printer has 7.99 dots per mm), so the codes stay scannable. Barcodes are still always Code 128 B.
+- **Banner:** "Visualize, edit and print label files for DUIVESTEIN" (was "Visualize and manually edit label files for a
+  Duivestein system"); `media\header.png` written again.
+- **The vertical line between the editor and the preview can be dragged** (Daan) to make one column wider; double-click =
+  two equal halves again. Each column keeps at least 330 px (at 100%). The share is remembered (`EditorColumnShare` in
+  `settings.json`, 0.1 – 0.9, default 0.5). The line is now a 41 px wide handle (`ColumnSplitter`) with the 1 px line in the
+  middle, thicker and darker under the mouse.
+- **After Daan's first test (same day):** the counter, the arrows and the print button moved BELOW the preview, centred,
+  and are twice as big (72 x 56 at 100%, arrow signs and icon twice as big too); the editor and the vertical line run
+  down to the bottom of that row. The label size moved from below the path boxes to their old place, right of the
+  preview title; the status line now has the whole width.
+- **After Daan's second test (same evening, touch screen in mind):** the `Sluiten` / Close button is gone (the window's X
+  still asks about unsaved changes). The blue Save button moved above the editor, left of `Template (xml)`, renamed
+  `Template opslaan` / `Enregistrer le modèle` / `Save template`, and is only shown while there are unsaved changes. The
+  footer row is gone: the preview's bottom is in line with the editor's again, and the big counter / arrows / print row
+  moved down into the freed place (centred below the preview, the ROGIERS logo at the left). The editor column now keeps
+  at least the width of its three title buttons when the line is dragged.
+- **After Daan's test with a real TsDssConverter label CSV:** X and Y below the label showed "?". Cause: the
+  HUPPY-PINCKAERS templates used the column names of Duivestein's example (`$XPOS$`, `$YPOS$`, `$LENGTH$`, `$WIDTH$`),
+  TsDssConverter's csv calls them `X`, `Y`, `SHEETLENGTH`, `SHEETWIDTH`. The two sample templates now use those names (and
+  `$PANELLENGTH$` / `$PANELWIDTH$` for the dimensions, as in Daan's own copy); `DAAN_ROGIERS-P2026.09_001.csv`
+  (TsDssConverter's expected output) is added as their example data. The preview now names, in red below the label,
+  every variable of the template that is not a column of the csv (`LabelItem.MissingVariables`), instead of a silent "?".
+  Daan's own copy in `C:\DssLabelTemplate\labels` is not touched (he edits it).
+- **CSV table for a touch screen:** font 4 points bigger (13 pt), rows 14 px (at 100%) higher than their text.
+- 138 tests. Rendered at a real 150% in Dutch and French (the only scaling of Daan's monitors at that moment).
+- **Delivery (customer test version):** `dist\v1.1.0\DssLabelTemplate.exe`, 53,201,994 bytes, file version 1.1.0.0, SHA-256
+  `ce52bf29e37890e8d491044b0e59488b5506f3129229932d01d995c79660760e`. Started once with `--data` on an empty folder: it
+  kept running and wrote settings.json, `labels\` (4 xml) and `CSV examples\` (2 csv). Not yet tried on the Zebra ZD220.
+
 ## 1.0.0 — 2026-10-25 (first release)
 
 - Version 0.5.0, checked by Daan, with a grey editor background `#E8E8E8` (`Theme.XmlBackground`; `#A0A0A0` was too dark to read the tags, a test checks the contrast now).

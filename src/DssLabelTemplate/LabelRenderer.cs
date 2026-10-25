@@ -12,6 +12,11 @@ namespace DssLabelTemplate;
 ///   - Text X, Y is the top left corner of the text, and a rotated text turns around that point;
 ///   - Rotation is counter-clockwise; a rotated barcode keeps its top left corner at X, Y (it stays inside X..X+Height);
 ///   - the default font is Arial 10 pt ("defined by DSSPrintServer").
+///
+/// The same code draws the preview AND the printed label (<see cref="LabelPrinter"/>), so what is seen is what is printed.
+/// For the printer (forPrinter: true) the bars of a barcode and the squares of a QR code are made a whole number of
+/// printer dots wide and start on a dot: on a 203 dpi label printer a bar of 2.4 dots would come out as 2 or 3 dots,
+/// and a scanner could no longer read it.
 /// </summary>
 internal static class LabelRenderer
 {
@@ -67,7 +72,8 @@ internal static class LabelRenderer
     /// Unknown objects are skipped silently (they may be new in DSS).
     /// </summary>
     /// <param name="baseFolder">The folder of the label file: an Image may have a path relative to it.</param>
-    public static void Draw(Graphics g, LabelItem label, string? baseFolder, LabelImages images, List<string> problems)
+    /// <param name="forPrinter">True when drawing on a printer: barcode bars and QR squares on whole printer dots.</param>
+    public static void Draw(Graphics g, LabelItem label, string? baseFolder, LabelImages images, List<string> problems, bool forPrinter = false)
     {
         foreach (XElement element in label.Element.Elements())
         {
@@ -77,8 +83,8 @@ internal static class LabelRenderer
                 "LINE" => DrawLine(g, element, label),
                 "RECTANGLE" => DrawRectangle(g, element, label),
                 "IMAGE" => DrawImage(g, element, label, baseFolder, images),
-                "BARCODE" => DrawBarcode(g, element, label),
-                "QRCODE" => DrawQrCode(g, element, label),
+                "BARCODE" => DrawBarcode(g, element, label, forPrinter),
+                "QRCODE" => DrawQrCode(g, element, label, forPrinter),
                 "ARROW" => DrawArrow(g, element, label),
                 _ => true,
             };
@@ -181,7 +187,7 @@ internal static class LabelRenderer
         return true;
     }
 
-    private static bool DrawBarcode(Graphics g, XElement element, LabelItem label)
+    private static bool DrawBarcode(Graphics g, XElement element, LabelItem label, bool forPrinter)
     {
         if (Number(element, label, "X") is not float x || Number(element, label, "Y") is not float y
             || Number(element, label, "Width") is not float width || Number(element, label, "Height") is not float height
@@ -199,6 +205,14 @@ internal static class LabelRenderer
         RectangleF turned = RotatedBounds(width, height, rotation);
         g.TranslateTransform(x - turned.X, y - turned.Y); // the turned barcode starts at X, Y
         g.RotateTransform(-rotation);
+
+        // On the printer: every bar a whole number of dots, starting on a dot (only possible when the bars run along the
+        // dots, so at 0, 90, 180 or 270 degrees). The barcode can then be a little narrower than Width, never wider.
+        if (forPrinter && rotation % 90 == 0)
+        {
+            module = WholeDots(g, module);
+            MoveOriginOntoDot(g);
+        }
 
         for (int i = 0; i < modules.Length; i++)
         {
@@ -222,10 +236,11 @@ internal static class LabelRenderer
     }
 
     /// <summary>
-    /// A QR code is drawn as a pattern that LOOKS like one (the three corner squares and modules that follow the text),
-    /// in the right place and size. It is not a real, scannable QR code: that is made by DSSPrintServer.
+    /// A real, scannable QR code (QRCoder, <see cref="QrCode"/>), as a square of the smaller of Width and Height with its
+    /// top left corner at X, Y. The white border a scanner needs around it (the "quiet zone") is not drawn: the template
+    /// must leave room for it, like DSSPrintServer's own QR code presumably does.
     /// </summary>
-    private static bool DrawQrCode(Graphics g, XElement element, LabelItem label)
+    private static bool DrawQrCode(Graphics g, XElement element, LabelItem label, bool forPrinter)
     {
         if (Number(element, label, "X") is not float x || Number(element, label, "Y") is not float y
             || Number(element, label, "Width") is not float width || Number(element, label, "Height") is not float height
@@ -234,45 +249,77 @@ internal static class LabelRenderer
             return false;
         }
 
-        const int count = 21; // the smallest QR code is 21 x 21 modules
-        float cell = Math.Min(width, height) / count;
-        string text = label.Variables.Resolve(element.Value).Trim();
-        uint hash = 2166136261; // FNV-1a: the same text always gives the same pattern (string.GetHashCode does not)
-        foreach (char c in text)
+        bool[,]? modules = QrCode.Modules(label.Variables.Resolve(element.Value).Trim());
+        if (modules == null)
         {
-            hash = (hash ^ c) * 16777619;
+            return false; // too much text for any QR code
         }
 
-        using var ink = new SolidBrush(Theme.LabelInk);
-        using var paper = new SolidBrush(Theme.LabelPaper);
+        int count = modules.GetLength(0);
+        float cell = Math.Min(width, height) / count;
+
+        GraphicsState state = g.Save();
+        g.TranslateTransform(x, y);
+        if (forPrinter)
+        {
+            cell = WholeDots(g, cell); // a little smaller than the box, never bigger
+            MoveOriginOntoDot(g);
+        }
+
+        // All dark squares in ONE path: on screen (anti-aliased) separate squares would show thin light seams between them.
+        using var path = new GraphicsPath(FillMode.Winding);
         for (int row = 0; row < count; row++)
         {
             for (int column = 0; column < count; column++)
             {
-                if (InFinder(column, row))
+                if (!modules[row, column])
                 {
                     continue;
                 }
 
-                hash = (hash ^ (uint)(row * count + column)) * 16777619;
-                if ((hash >> 13 & 1) == 1)
+                int run = 1; // the dark squares next to each other in this row: one rectangle
+                while (column + run < count && modules[row, column + run])
                 {
-                    g.FillRectangle(ink, x + column * cell, y + row * cell, cell, cell);
+                    run++;
                 }
+
+                path.AddRectangle(new RectangleF(column * cell, row * cell, run * cell, cell));
+                column += run - 1;
             }
         }
 
-        foreach ((int column, int row) in new[] { (0, 0), (count - 7, 0), (0, count - 7) })
+        using var ink = new SolidBrush(Theme.LabelInk);
+        g.FillPath(ink, path);
+        g.Restore(state);
+        return true;
+    }
+
+    /// <summary>
+    /// The size of one bar or square, made a whole number of printer dots (at least 1, rounded down so the code never
+    /// grows out of its box). Measured along the X direction of the drawing as it is turned now.
+    /// </summary>
+    private static float WholeDots(Graphics g, float size)
+    {
+        PointF[] points = { new(0, 0), new(1, 0) };
+        g.TransformPoints(CoordinateSpace.Device, CoordinateSpace.World, points);
+        float dotsPerUnit = (float)Math.Sqrt(Math.Pow(points[1].X - points[0].X, 2) + Math.Pow(points[1].Y - points[0].Y, 2));
+        if (dotsPerUnit <= 0)
         {
-            g.FillRectangle(ink, x + column * cell, y + row * cell, 7 * cell, 7 * cell);
-            g.FillRectangle(paper, x + (column + 1) * cell, y + (row + 1) * cell, 5 * cell, 5 * cell);
-            g.FillRectangle(ink, x + (column + 2) * cell, y + (row + 2) * cell, 3 * cell, 3 * cell);
+            return size;
         }
 
-        return true;
+        int dots = Math.Max(1, (int)Math.Floor(size * dotsPerUnit + 0.001f)); // 0.001: 2.9999 dots is 3 dots
+        return dots / dotsPerUnit;
+    }
 
-        static bool InFinder(int column, int row) =>
-            (column < 8 && row < 8) || (column >= count - 8 && row < 8) || (column < 8 && row >= count - 8);
+    /// <summary>Moves (0, 0) of the drawing by less than one dot, so it lies exactly on a printer dot.</summary>
+    private static void MoveOriginOntoDot(Graphics g)
+    {
+        PointF[] origin = { PointF.Empty };
+        g.TransformPoints(CoordinateSpace.Device, CoordinateSpace.World, origin);
+        PointF[] onDot = { new((float)Math.Round(origin[0].X), (float)Math.Round(origin[0].Y)) };
+        g.TransformPoints(CoordinateSpace.World, CoordinateSpace.Device, onDot);
+        g.TranslateTransform(onDot[0].X, onDot[0].Y);
     }
 
     /// <summary>

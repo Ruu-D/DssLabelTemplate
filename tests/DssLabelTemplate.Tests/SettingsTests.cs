@@ -57,6 +57,32 @@ public class SettingsTests
     }
 
     [Fact]
+    public void AnImpossibleColumnShareInTheFile_IsBackToTwoEqualHalves_AndNullPrinterIsEmpty()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+        File.WriteAllText(path, "{ \"EditorColumnShare\": 1.5, \"PrinterName\": null }");
+
+        AppSettings settings = SettingsStore.Load(path);
+
+        Assert.Equal(AppSettings.DefaultEditorColumnShare, settings.EditorColumnShare);
+        Assert.Equal("", settings.PrinterName);
+    }
+
+    [Fact]
+    public void ThePrinterAndTheColumnShare_AreSavedAndLoaded()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        SettingsStore.Save(path, new AppSettings { PrinterName = "ZDesigner ZD220-203dpi ZPL", EditorColumnShare = 0.35 });
+        AppSettings loaded = SettingsStore.Load(path);
+
+        Assert.Equal("ZDesigner ZD220-203dpi ZPL", loaded.PrinterName);
+        Assert.Equal(0.35, loaded.EditorColumnShare);
+    }
+
+    [Fact]
     public void ASettingsFileWithoutALabelSize_Gives100By100()
     {
         using var folder = new TempFolder();

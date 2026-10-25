@@ -1,13 +1,17 @@
+using System.Drawing.Printing;
+
 namespace DssLabelTemplate;
 
 /// <summary>
 /// The only window of the program. Same look as the settings window of TsDssConverter (banner, language and credit at
-/// the top, logo and buttons at the bottom), with in between:
+/// the top, logo at the bottom left), with in between:
 ///   row 1 (low):  the two label files, each with a path box and a Browse button: the template or label-xml (shown in the
 ///                 editor) and the label-csv (the data for a template). Above them what the two kinds of label files are,
-///                 below them a status line (which kind is open, how many labels) and the label size;
-///   row 2 (high): left the text of the label-xml or template (a simple Notepad), right the preview of one label, with
-///                 two arrows to go through the labels when there is more than one.
+///                 below them a status line (which kind is open, how many labels);
+///   row 2 (high): left the text of the label-xml or template (a simple Notepad) with "Save template" above it after a
+///                 change, right the preview of one label with the label size above it and, at the bottom of the window,
+///                 two big arrows to go through the labels and a big print button (made for a touch screen). The line
+///                 between the two columns can be dragged.
 /// The two kinds of files (DSS Software Interface, "Label"): a label-csv + a label template (the editor shows the template,
 /// the csv gives the data, one label per csv line), or a label-xml (all labels of one sheet in one file).
 /// The layout is built in code, so it can be read and reviewed like any other code.
@@ -30,8 +34,13 @@ internal class MainForm : Form
     // All buttons have exactly this size (at 100%), so they line up and look the same.
     private static readonly Size ButtonSize = new(100, 28);
 
-    // The two arrows next to the preview title: as high as the other buttons, narrow.
-    private static readonly Size ArrowButtonSize = new(36, 28);
+    // The two arrows and the print button below the preview: twice the size of the 36 x 28 they had next to the title
+    // (Daan, 2026-10-25: easier to hit at the reprint station).
+    private static readonly Size NavigationButtonSize = new(72, 56);
+
+    // Dragging the vertical line: the preview column keeps at least this width (at 100%), so the label size still fits
+    // next to a few letters of its title. (For the editor column see MinimumEditorColumnWidth.)
+    private const int MinimumColumnWidth = 330;
 
     // The two fields of the label size: as high as the buttons, room for "1000,5".
     private static readonly Size LabelSizeBoxSize = new(60, 28);
@@ -39,7 +48,19 @@ internal class MainForm : Form
     // The two buttons above the left column (template / csv): wide enough for "CSV d'étiquettes" (a test checks all languages).
     private static readonly Size ViewButtonSize = new(120, 28);
 
-    // The company logo in the footer and the user-guide icon next to the app version (at 100%).
+    // The csv table, for a touch screen: its font this many points bigger than the window's (9 → 13 pt), and every row this
+    // many pixels (at 100%) higher than its text.
+    private const float CsvExtraPoints = 4;
+    private const int CsvRowExtraHeight = 14;
+
+    // The save button left of them: wide enough for "Enregistrer le modèle" (a test checks all languages).
+    private static readonly Size SaveButtonSize = new(150, 28);
+
+    // The editor column is never narrower than its title buttons (save + the two view buttons); the title itself may
+    // then shrink to "…". The preview column keeps at least MinimumColumnWidth.
+    private static readonly int MinimumEditorColumnWidth = SaveButtonSize.Width + 4 + 2 * ViewButtonSize.Width + 4;
+
+    // The company logo at the bottom left and the user-guide icon next to the app version (at 100%).
     private static readonly Size LogoSize = new(35, 32);
     private static readonly Size UserGuideIconSize = new(16, 16);
 
@@ -65,7 +86,7 @@ internal class MainForm : Form
     internal readonly Label LabelSizeCaption = new(); // "Labelformaat (mm):", right of the status line
     internal readonly TextBox LabelLengthBox = new(); // the label length in mm (horizontal, X)
     internal readonly TextBox LabelWidthBox = new();  // the label width in mm (vertical, Y)
-    internal readonly TableLayoutPanel LabelSizePanel = new(); // the caption and the two fields, against the right edge
+    internal readonly TableLayoutPanel LabelSizePanel = new(); // the caption and the two fields, right of the preview title
     internal readonly Label EditorCaption = new();
     internal readonly RoundedButton XmlViewButton = new(); // shows the template text (only visible with a label-csv)
     internal readonly RoundedButton CsvViewButton = new(); // shows the csv data as a table
@@ -76,14 +97,16 @@ internal class MainForm : Form
     internal readonly Label LabelCounter = new();    // "2 / 3", left of the arrows
     internal readonly RoundedButton PreviousButton = new();
     internal readonly RoundedButton NextButton = new();
-    internal readonly TableLayoutPanel PreviewHeader = new(); // the preview title with the counter and the arrows
+    internal readonly RoundedButton PrintButton = new(); // right of the arrows: prints the shown label (or more)
+    internal readonly TableLayoutPanel PreviewHeader = new(); // the preview title with the label size
+    internal readonly TableLayoutPanel PreviewNavigation = new(); // below the preview: the counter, the arrows and print
     internal readonly XmlEditor Editor = new();
     internal readonly LabelPreview Preview = new();
-    internal readonly Panel ColumnDivider = new();   // the vertical line between the editor and the preview
+    internal readonly ColumnSplitter ColumnDivider = new(); // the vertical line between the editor and the preview, can be dragged
+    internal readonly TableLayoutPanel Workspace = new();   // row 2: the two columns and the line between them
     internal readonly List<Panel> Dividers = new();  // the horizontal lines
     internal readonly PictureBox LogoPicture = new();
-    internal readonly RoundedButton SaveButton = new();
-    internal readonly RoundedButton CloseButton = new();
+    internal readonly RoundedButton SaveButton = new(); // "Template opslaan", left of the view buttons, only after a change
 
     private readonly ToolTip _toolTip = new();
     private readonly System.Windows.Forms.Timer _previewTimer = new() { Interval = PreviewDelayMilliseconds };
@@ -225,18 +248,15 @@ internal class MainForm : Form
         AddRow(body, ref row, BuildStatusRow());
 
         _fileRow.SizeChanged += (sender, e) => FitFileTexts();
-        LabelSizePanel.SizeChanged += (sender, e) => FitFileTexts();
         FileDescription.FontChanged += (sender, e) => FitFileTexts(); // the window moved to a screen with another scaling
         AddDivider(body, ref row, new Padding(0, 16, 0, 12));
 
-        // Row 2: the editor and the preview. The only row that takes the rest of the height.
+        // Row 2: the editor and the preview, and below them the logo and the big buttons (there is no footer row any
+        // more: Close is gone and Save sits above the editor, Daan 2026-10-25). Takes the rest of the height.
         Control workspace = BuildWorkspace();
         body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         body.Controls.Add(workspace, 0, row);
         row++;
-
-        // The last row: the logo on the left, Save / Close on the right.
-        AddRow(body, ref row, BuildBottomRow());
         body.RowCount = row;
 
         // Docking: the control that is added LAST sits at the very top.
@@ -394,29 +414,31 @@ internal class MainForm : Form
             FileDescription.Size = description;
         }
 
-        // The status line takes what the label size leaves free. The size panel's PREFERRED width, not its current one:
-        // when the status line was too wide for a moment, the panel was squeezed (to 1 pixel) and would have stayed so.
-        int sizePanel = LabelSizePanel.GetPreferredSize(Size.Empty).Width + LabelSizePanel.Margin.Horizontal;
-        int free = width - sizePanel - FileStatus.Margin.Horizontal;
-        var status = new Size(Math.Max(0, free), FileStatus.PreferredHeight);
+        // The status line has the whole width (the label size moved to the preview title, Daan 2026-10-25).
+        var status = new Size(Math.Max(0, width - FileStatus.Margin.Horizontal), FileStatus.PreferredHeight);
         if (FileStatus.Size != status)
         {
             FileStatus.Size = status;
         }
     }
 
-    /// <summary>
-    /// Below the path box: the status line on the left and, against the right edge (in line with Browse), the label size:
-    /// "Labelformaat (mm): [100] × [100]". The label files do not contain the size of the label, so it is set here.
-    /// </summary>
+    /// <summary>Below the path boxes: the status line (what is open, how many labels), over the whole width.</summary>
     private Control BuildStatusRow()
     {
         FileStatus.AutoSize = false;     // its size comes from FitFileTexts
         FileStatus.AutoEllipsis = true;  // a long csv path ends in "…" instead of a second line
-        FileStatus.Anchor = AnchorStyles.Left; // in the middle of the row's height
-        FileStatus.Margin = new Padding(0, 0, 8, 0);
+        FileStatus.Anchor = AnchorStyles.Left;
+        FileStatus.Margin = new Padding(0, 6, 0, 0);
         FileStatus.ForeColor = Theme.Navy;
+        return FileStatus;
+    }
 
+    /// <summary>
+    /// The label size, right of the preview title (Daan, 2026-10-25; it was below the path boxes): "Labelformaat (mm):
+    /// [100] × [100]". The label files do not contain the size of the label, so it is set here.
+    /// </summary>
+    private Control BuildLabelSizePanel()
+    {
         LabelSizeCaption.AutoSize = true;
         LabelSizeCaption.Anchor = AnchorStyles.Left;
         LabelSizeCaption.Margin = new Padding(0, 0, 6, 0);
@@ -440,16 +462,7 @@ internal class MainForm : Form
         LabelSizePanel.Controls.Add(LabelSizeFrame(LabelLengthBox), 1, 0);
         LabelSizePanel.Controls.Add(times, 2, 0);
         LabelSizePanel.Controls.Add(LabelSizeFrame(LabelWidthBox), 3, 0);
-
-        // Two cells, like the footer: the status line (fixed size, AutoSize column) and the size panel (the rest, anchored
-        // at the right edge). Not the other way round: a fixed-size control in a Percent column of an AutoSize table shrinks.
-        var statusRow = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 0) };
-        statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        statusRow.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        statusRow.Controls.Add(FileStatus, 0, 0);
-        statusRow.Controls.Add(LabelSizePanel, 1, 0);
-        return statusRow;
+        return LabelSizePanel;
     }
 
     /// <summary>One field of the label size, in the same rounded frame as the path box, the number on the right.</summary>
@@ -545,9 +558,10 @@ internal class MainForm : Form
     }
 
     /// <summary>
-    /// Row 2: two columns of equal width with a thin vertical line between them. Left the text of the template, right
-    /// the preview of the label; above each a bold title. This table is not AutoSize (it fills the rest of the window),
-    /// so its controls may stretch.
+    /// Row 2: two columns with a thin vertical line between them. Left the text of the template, right the preview of the
+    /// label; above each a bold title. The line can be dragged to make one column wider (the share is remembered in
+    /// settings.json); a double-click gives two equal halves again. This table is not AutoSize (it fills the rest of the
+    /// window), so its controls may stretch.
     /// </summary>
     private Control BuildWorkspace()
     {
@@ -566,34 +580,101 @@ internal class MainForm : Form
         Preview.Margin = new Padding(0);
         Preview.BackColor = Theme.White;
 
-        ColumnDivider.Width = 1;
+        // The handle is as wide as the room around the line (it used to be a 1 px line with 20 px margins), so it is easy
+        // to grab. Its column is AutoSize: a fixed-size control in a Percent column would be shrunk.
+        ColumnDivider.Width = ColumnSplitter.HandleWidth;
         ColumnDivider.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom;
-        ColumnDivider.BackColor = Theme.PaleBlue;
-        ColumnDivider.Margin = new Padding(20, 0, 20, 0);
+        ColumnDivider.Margin = new Padding(0);
+        ColumnDivider.Dragged += DragColumnDivider;
+        ColumnDivider.Released += TrySaveSettings;
+        ColumnDivider.ResetRequested += () =>
+        {
+            SetEditorColumnShare(AppSettings.DefaultEditorColumnShare);
+            TrySaveSettings();
+        };
 
-        var workspace = new TableLayoutPanel { ColumnCount = 3, RowCount = 2, Dock = DockStyle.Fill, Margin = new Padding(0) };
-        workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        workspace.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        workspace.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        workspace.Controls.Add(BuildEditorHeader(), 0, 0);
-        workspace.Controls.Add(BuildPreviewHeader(), 2, 0);
-        workspace.Controls.Add(EditorArea, 0, 1);
-        workspace.Controls.Add(ColumnDivider, 1, 1);
-        workspace.Controls.Add(Preview, 2, 1);
-        return workspace;
+        Workspace.ColumnCount = 3;
+        Workspace.RowCount = 3;
+        Workspace.Dock = DockStyle.Fill;
+        Workspace.Margin = new Padding(0);
+        float editorPercent = (float)(_settings.EditorColumnShare * 100); // the share of the last time (0.5 = equal halves)
+        Workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, editorPercent));
+        Workspace.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        Workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100 - editorPercent));
+        // Three rows: the titles; the editor and the preview (their bottoms in line); the last row of the window, with
+        // the logo at the left and, below the preview, the counter, arrows and print button (where Save / Close were).
+        Workspace.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        Workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        Workspace.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        Workspace.Controls.Add(BuildEditorHeader(), 0, 0);
+        Workspace.Controls.Add(BuildPreviewHeader(), 2, 0);
+        Workspace.Controls.Add(EditorArea, 0, 1);
+        Workspace.Controls.Add(ColumnDivider, 1, 1);
+        Workspace.Controls.Add(Preview, 2, 1);
+        Workspace.Controls.Add(BuildLogo(), 0, 2);
+        Workspace.Controls.Add(BuildPreviewNavigation(), 2, 2);
+        return Workspace;
     }
 
     /// <summary>
-    /// The title of the left column and, against its right edge, the two buttons "Template (xml)" / "Label-csv" that
-    /// choose what the column shows (only visible when a label-csv is open). Like the preview header, always as high as a
-    /// button, so nothing jumps when the buttons appear.
+    /// The vertical line is being dragged: the middle of the line follows the mouse (X in the coordinates of the workspace).
+    /// </summary>
+    internal void DragColumnDivider(int mouseX)
+    {
+        int available = ColumnsWidth();
+        if (available > 0)
+        {
+            SetEditorColumnShare((mouseX - Workspace.Padding.Left - ColumnDivider.Width / 2.0) / available);
+        }
+    }
+
+    /// <summary>
+    /// Gives the left column this part of the width (0.5 = equal halves) and the preview the rest. The editor keeps at
+    /// least <see cref="MinimumEditorColumnWidth"/>, the preview <see cref="MinimumColumnWidth"/>; when the window is too
+    /// narrow for both, they share the room in that proportion. The share is put in the settings (saved by the caller,
+    /// when dragging stops).
+    /// </summary>
+    internal void SetEditorColumnShare(double share)
+    {
+        int available = ColumnsWidth();
+        if (available > 0)
+        {
+            double editorMinimum = LogicalToDeviceUnits(MinimumEditorColumnWidth);
+            double previewMinimum = LogicalToDeviceUnits(MinimumColumnWidth);
+            double lowest = editorMinimum / available;
+            double highest = 1 - previewMinimum / available;
+            share = lowest <= highest
+                ? Math.Max(lowest, Math.Min(highest, share))
+                : editorMinimum / (editorMinimum + previewMinimum);
+        }
+
+        share = Math.Max(AppSettings.MinimumEditorColumnShare, Math.Min(AppSettings.MaximumEditorColumnShare, share));
+
+        _settings.EditorColumnShare = share;
+        Workspace.ColumnStyles[0].Width = (float)(share * 100);
+        Workspace.ColumnStyles[2].Width = (float)(100 - share * 100);
+    }
+
+    /// <summary>The width of the two columns together (the workspace without the vertical line).</summary>
+    private int ColumnsWidth() => Workspace.ClientSize.Width - Workspace.Padding.Horizontal - ColumnDivider.Width;
+
+    /// <summary>
+    /// The title of the left column and, against its right edge, the blue "Template opslaan" (only when the text was
+    /// changed, Daan 2026-10-25) and the two buttons "Template (xml)" / "Label-csv" that choose what the column shows
+    /// (only visible when a label-csv is open). Like the preview header, always as high as a button, so nothing jumps
+    /// when the buttons appear.
     /// </summary>
     private Control BuildEditorHeader()
     {
         EditorCaption.Font = new Font(Font, FontStyle.Bold);
         MakeOneLineTitle(EditorCaption);
+
+        SaveButton.Size = SaveButtonSize;
+        SaveButton.Margin = new Padding(0, 0, 4, 0);
+        SaveButton.Visible = false; // nothing changed yet
+        Theme.StylePrimaryButton(SaveButton);
+        SaveButton.Click += (sender, e) => SaveFile();
+        // No AcceptButton: Enter in the path box opens the file, Enter in the editor starts a new line.
 
         XmlViewButton.Size = ViewButtonSize;
         XmlViewButton.Margin = new Padding(0, 0, 4, 0);
@@ -602,19 +683,23 @@ internal class MainForm : Form
         XmlViewButton.Click += (sender, e) => ShowCsvView(false);
         CsvViewButton.Click += (sender, e) => ShowCsvView(true);
 
-        EditorHeader.ColumnCount = 3;
+        EditorHeader.ColumnCount = 4;
         EditorHeader.RowCount = 1;
         EditorHeader.AutoSize = true;
         EditorHeader.Dock = DockStyle.Fill;
         EditorHeader.Margin = new Padding(0, 0, 0, 4);
         EditorHeader.MinimumSize = new Size(0, ViewButtonSize.Height);
         EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        for (int i = 0; i < 3; i++)
+        {
+            EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        }
+
         EditorHeader.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         EditorHeader.Controls.Add(EditorCaption, 0, 0);
-        EditorHeader.Controls.Add(XmlViewButton, 1, 0);
-        EditorHeader.Controls.Add(CsvViewButton, 2, 0);
+        EditorHeader.Controls.Add(SaveButton, 1, 0);
+        EditorHeader.Controls.Add(XmlViewButton, 2, 0);
+        EditorHeader.Controls.Add(CsvViewButton, 3, 0);
         return EditorHeader;
     }
 
@@ -654,13 +739,17 @@ internal class MainForm : Form
         CsvGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
         CsvGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
 
+        // Bigger than the rest of the window, for a touch screen (Daan, 2026-10-25): the font 4 points bigger, and the rows
+        // higher than the text (FillCsvGrid). The control's own Font, so WinForms scales it with the screen like the others.
+        CsvGrid.Font = new Font(Font.FontFamily, Font.SizeInPoints + CsvExtraPoints, FontStyle.Regular, GraphicsUnit.Point);
+
         // The headers in the colours of the theme (otherwise Windows draws them in its own grey).
         CsvGrid.EnableHeadersVisualStyles = false;
         CsvGrid.ColumnHeadersDefaultCellStyle.BackColor = Theme.VeryPaleBlue;
         CsvGrid.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Navy;
         CsvGrid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Theme.VeryPaleBlue;
         CsvGrid.ColumnHeadersDefaultCellStyle.SelectionForeColor = Theme.Navy;
-        CsvGrid.ColumnHeadersDefaultCellStyle.Font = new Font(Font, FontStyle.Bold);
+        CsvGrid.ColumnHeadersDefaultCellStyle.Font = new Font(CsvGrid.Font, FontStyle.Bold);
         CsvGrid.DefaultCellStyle.BackColor = Theme.White;
         CsvGrid.DefaultCellStyle.ForeColor = Theme.Navy;
         CsvGrid.DefaultCellStyle.SelectionBackColor = Theme.PaleBlue;
@@ -675,6 +764,10 @@ internal class MainForm : Form
         _selectingCsvRow = true; // filling selects the first row: that is not a choice of the user
         CsvGrid.Rows.Clear();
         CsvGrid.Columns.Clear();
+
+        // Room above and below the text of every row, easy to tap on a touch screen. Set here (not when the table is
+        // built) because the font height in pixels is only right once the window is on its screen.
+        CsvGrid.RowTemplate.Height = CsvGrid.Font.Height + LogicalToDeviceUnits(CsvRowExtraHeight);
 
         if (csv != null)
         {
@@ -752,21 +845,45 @@ internal class MainForm : Form
     }
 
     /// <summary>
-    /// The title of the preview and, against the right edge of the preview, "2 / 3" and the two arrows (only visible
-    /// when there is more than one label: a label-xml of a whole sheet, or a template with a csv of several lines).
-    /// The header is always as high as an arrow, also without arrows, so the editor and the preview never jump.
+    /// The title of the preview and, against the right edge of the preview, the label size (Daan, 2026-10-25: in the
+    /// place the arrows had). As high as the editor header (the size fields are as high as a button).
     /// </summary>
     private Control BuildPreviewHeader()
+    {
+        // The title takes the free width (one line, "…" when the column is narrow); the label size what it needs.
+        PreviewHeader.ColumnCount = 2;
+        PreviewHeader.RowCount = 1;
+        PreviewHeader.AutoSize = true;
+        PreviewHeader.Dock = DockStyle.Fill;
+        PreviewHeader.Margin = new Padding(0, 0, 0, 4);
+        PreviewHeader.MinimumSize = new Size(0, ViewButtonSize.Height);
+        PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        PreviewHeader.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        PreviewHeader.Controls.Add(PreviewCaption, 0, 0);
+        PreviewHeader.Controls.Add(BuildLabelSizePanel(), 1, 0);
+        return PreviewHeader;
+    }
+
+    /// <summary>
+    /// Below the preview, in the middle (Daan, 2026-10-25): "2 / 3", the two arrows (only when there is more than one
+    /// label) and the print button (as soon as there is a label), all twice as big as the other buttons. The row is always
+    /// as high as these buttons, also when they are hidden, so the preview never jumps.
+    /// </summary>
+    private Control BuildPreviewNavigation()
     {
         LabelCounter.AutoSize = true;
         LabelCounter.Anchor = AnchorStyles.Left;
         LabelCounter.Margin = new Padding(0, 0, 8, 0);
         LabelCounter.ForeColor = Theme.Navy;
 
+        // The arrow signs twice as big too, to fit the bigger buttons.
+        var arrowFont = new Font(Font.FontFamily, Font.SizeInPoints * 2, FontStyle.Regular, GraphicsUnit.Point);
         foreach (RoundedButton arrow in new[] { PreviousButton, NextButton })
         {
-            arrow.Size = ArrowButtonSize;
+            arrow.Size = NavigationButtonSize;
             arrow.Margin = new Padding(0);
+            arrow.Font = arrowFont;
             Theme.StyleSecondaryButton(arrow);
         }
 
@@ -776,69 +893,48 @@ internal class MainForm : Form
         PreviousButton.Click += (sender, e) => ShowLabel(Preview.Index - 1);
         NextButton.Click += (sender, e) => ShowLabel(Preview.Index + 1);
 
-        // The title takes the free width; the counter and the arrows only what they need (AutoSize columns: the arrows
-        // have a fixed size, and a fixed-size control in a Percent column of an AutoSize table is shrunk).
-        PreviewHeader.ColumnCount = 4;
-        PreviewHeader.RowCount = 1;
-        PreviewHeader.AutoSize = true;
-        PreviewHeader.Dock = DockStyle.Fill;
-        PreviewHeader.Margin = new Padding(0, 0, 0, 4);
-        PreviewHeader.MinimumSize = new Size(0, ArrowButtonSize.Height);
-        PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        PreviewHeader.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        PreviewHeader.Controls.Add(PreviewCaption, 0, 0);
-        PreviewHeader.Controls.Add(LabelCounter, 1, 0);
-        PreviewHeader.Controls.Add(PreviousButton, 2, 0);
-        PreviewHeader.Controls.Add(NextButton, 3, 0);
-        return PreviewHeader;
+        // The print button: right of the arrows, the same size, the printer icon instead of a text. A little more room in
+        // front of it than between the arrows: it does something else than going through the labels.
+        PrintButton.Size = NavigationButtonSize;
+        PrintButton.Margin = new Padding(12, 0, 0, 0);
+        PrintButton.Image = AppIcons.Print();
+        PrintButton.IconHeight = 2 * RoundedButton.DefaultIconHeight;
+        Theme.StyleSecondaryButton(PrintButton);
+        PrintButton.Click += (sender, e) => PrintLabels();
+
+        // AutoSize columns only (the buttons have a fixed size); the whole row is centred below the preview.
+        PreviewNavigation.ColumnCount = 4;
+        PreviewNavigation.RowCount = 1;
+        PreviewNavigation.AutoSize = true;
+        PreviewNavigation.Anchor = AnchorStyles.Top; // centred in its cell
+        PreviewNavigation.Margin = new Padding(0, 20, 0, 0); // the room the footer with Save / Close had above it
+        PreviewNavigation.MinimumSize = new Size(0, NavigationButtonSize.Height);
+        for (int i = 0; i < 4; i++)
+        {
+            PreviewNavigation.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        }
+
+        PreviewNavigation.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        PreviewNavigation.Controls.Add(LabelCounter, 0, 0);
+        PreviewNavigation.Controls.Add(PreviousButton, 1, 0);
+        PreviewNavigation.Controls.Add(NextButton, 2, 0);
+        PreviewNavigation.Controls.Add(PrintButton, 3, 0);
+        return PreviewNavigation;
     }
 
-    /// <summary>The bottom line of the window: the company logo at the left, Save and Close at the right.</summary>
-    private Control BuildBottomRow()
+    /// <summary>The company logo at the bottom left of the window (below the editor), opens rogiers.be.</summary>
+    private Control BuildLogo()
     {
         LogoPicture.Image = AppIcons.CompanyLogo();
         LogoPicture.SizeMode = PictureBoxSizeMode.Zoom; // keeps the proportions of the logo
         LogoPicture.Size = LogoSize;
         LogoPicture.BackColor = Theme.White;
-        LogoPicture.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
+        LogoPicture.Anchor = AnchorStyles.Left | AnchorStyles.Bottom; // its bottom in line with the bottom of the big buttons
         LogoPicture.Margin = new Padding(0);
         LogoPicture.Cursor = Cursors.Hand;
         _toolTip.SetToolTip(LogoPicture, Strings.CompanyName);
         LogoPicture.Click += (sender, e) => OpenWebsite(Strings.CompanyUrl);
-
-        // Same size and same margins for both, so they sit in one line.
-        SaveButton.Size = ButtonSize;
-        SaveButton.Margin = new Padding(8, 0, 0, 0);
-        CloseButton.Size = ButtonSize;
-        CloseButton.Margin = new Padding(8, 0, 0, 0);
-        Theme.StylePrimaryButton(SaveButton);
-        Theme.StyleSecondaryButton(CloseButton);
-        SaveButton.Click += (sender, e) => SaveFile();
-        CloseButton.Click += (sender, e) => Close();
-        // No AcceptButton: Enter in the path box opens the file, Enter in the editor starts a new line.
-
-        var buttons = new FlowLayoutPanel
-        {
-            FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false,
-            AutoSize = true,
-            Anchor = AnchorStyles.Right | AnchorStyles.Bottom,
-            Margin = new Padding(0),
-        };
-        buttons.Controls.Add(CloseButton); // right to left: Close is the right-most button
-        buttons.Controls.Add(SaveButton);
-
-        // The logo only what it needs, the buttons the rest (a Percent column would shrink the logo).
-        var bottom = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 20, 0, 0) };
-        bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        bottom.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        bottom.Controls.Add(LogoPicture, 0, 0);
-        bottom.Controls.Add(buttons, 1, 0);
-        return bottom;
+        return LogoPicture;
     }
 
     /// <summary>A thin horizontal line over the full width, in the pale blue of the theme.</summary>
@@ -879,8 +975,10 @@ internal class MainForm : Form
         _toolTip.SetToolTip(LabelWidthBox, Strings.LabelWidthTooltip);
         _toolTip.SetToolTip(PreviousButton, Strings.PreviousLabel);
         _toolTip.SetToolTip(NextButton, Strings.NextLabel);
-        SaveButton.Text = Strings.Save;
-        CloseButton.Text = Strings.Close;
+        _toolTip.SetToolTip(PrintButton, Strings.PrintTooltip);
+        PrintButton.AccessibleName = Strings.PrintTooltip; // the button has a picture, no text: for a screen reader
+        _toolTip.SetToolTip(ColumnDivider, Strings.ColumnDividerTooltip);
+        SaveButton.Text = Strings.SaveTemplate;
         FitFileTexts(); // the description has another length in another language
         RefreshPreview(newFile: false); // the preview's messages and the status line are in the language too
     }
@@ -1070,6 +1168,72 @@ internal class MainForm : Form
         return true;
     }
 
+    /// <summary>
+    /// The print button (and Ctrl+P): the Windows print dialog, starting with the printer of the last time and with
+    /// "current page" = the label in the preview. "Pages" are the label numbers ("2 / 3"), so the dialog can also print
+    /// all labels or a range. Before printing, the printer's page is compared with the label size of the window.
+    /// </summary>
+    internal void PrintLabels()
+    {
+        if (Preview.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            using var document = new PrintDocument
+            {
+                DocumentName = Strings.AppName + " - " + (_currentFile == null ? Strings.Untitled : Path.GetFileName(_currentFile)),
+            };
+            if (_settings.PrinterName != "" && PrinterSettings.InstalledPrinters.Cast<string>().Contains(_settings.PrinterName))
+            {
+                document.PrinterSettings.PrinterName = _settings.PrinterName;
+            }
+
+            document.PrinterSettings.MinimumPage = 1;
+            document.PrinterSettings.MaximumPage = Preview.Count;
+            document.PrinterSettings.FromPage = Preview.Index + 1;
+            document.PrinterSettings.ToPage = Preview.Index + 1;
+            document.PrinterSettings.PrintRange = PrintRange.CurrentPage;
+
+            // UseEXDialog: the dialog with "current page" (the newer Windows dialog has no page choice).
+            using var dialog = new PrintDialog { Document = document, UseEXDialog = true, AllowCurrentPage = true, AllowSomePages = true };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            PrinterSettings chosen = document.PrinterSettings;
+            List<int> numbers = LabelPrinter.LabelsToPrint(chosen.PrintRange, chosen.FromPage, chosen.ToPage, Preview.Index, Preview.Count);
+            if (numbers.Count == 0)
+            {
+                return;
+            }
+
+            _settings.PrinterName = chosen.PrinterName;
+            TrySaveSettings();
+
+            SizeF paper = LabelPrinter.PaperSize(document.DefaultPageSettings);
+            if (!LabelPrinter.PaperFits(paper, Preview.LabelSize))
+            {
+                string question = Strings.PaperSizeQuestion(chosen.PrinterName, LabelXml.Format(paper.Width), LabelXml.Format(paper.Height),
+                    LabelXml.Format(Preview.LabelSize.Width), LabelXml.Format(Preview.LabelSize.Height));
+                if (MessageBox.Show(this, question, Strings.AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                {
+                    return;
+                }
+            }
+
+            string? folder = _currentFile == null ? null : Path.GetDirectoryName(_currentFile);
+            LabelPrinter.Print(document, numbers.Select(number => Preview.Labels!.Labels[number]).ToList(), folder);
+        }
+        catch (Exception error) when (error is InvalidPrinterException || error is System.ComponentModel.Win32Exception)
+        {
+            MessageBox.Show(this, Strings.CannotPrint(error.Message), Strings.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
     /// <summary>The upper Browse button (and Ctrl+O): a template or a label-xml.</summary>
     private void BrowseForXmlFile()
     {
@@ -1227,6 +1391,9 @@ internal class MainForm : Form
         PreviousButton.Enabled = Preview.Index > 0;
         NextButton.Enabled = Preview.Index < count - 1;
 
+        // Print: as soon as there is a label to print (also just one); not for broken xml or an empty label file.
+        PrintButton.Visible = count > 0;
+
         // The two view buttons only with a label-csv that is used; the csv table follows the label of the preview.
         bool csv = _csv != null && !_isLabelXml;
         XmlViewButton.Visible = csv;
@@ -1253,9 +1420,14 @@ internal class MainForm : Form
         };
     }
 
-    /// <summary>The title bar: the program name, the open file, and a * when there are unsaved changes (like Notepad).</summary>
+    /// <summary>
+    /// The title bar: the program name, the open file, and a * when there are unsaved changes (like Notepad). The save
+    /// button follows the same * : it is only shown while there is something to save.
+    /// </summary>
     private void UpdateTitle()
     {
+        SaveButton.Visible = _modified;
+
         string title = Strings.AppName;
         if (_currentFile != null || _modified)
         {
@@ -1292,12 +1464,18 @@ internal class MainForm : Form
 
     // ------------------------------------------------------------------ window events
 
-    /// <summary>Ctrl+S saves, Ctrl+O opens (as in Notepad).</summary>
+    /// <summary>Ctrl+S saves, Ctrl+O opens, Ctrl+P prints (as in Notepad).</summary>
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
         if (keyData == (Keys.Control | Keys.S))
         {
             SaveFile();
+            return true;
+        }
+
+        if (keyData == (Keys.Control | Keys.P))
+        {
+            PrintLabels();
             return true;
         }
 
@@ -1326,6 +1504,7 @@ internal class MainForm : Form
     {
         base.OnLoad(e); // the scaling of the whole window has been applied by now
         FitToArea(Screen.FromControl(this).WorkingArea);
+        SetEditorColumnShare(_settings.EditorColumnShare); // the share of the last time, within the minimum widths of now
     }
 
     protected override void OnShown(EventArgs e)

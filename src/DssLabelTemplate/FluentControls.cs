@@ -137,9 +137,16 @@ internal class RoundedButton : Button
             }
         }
 
-        TextRenderer.DrawText(g, Text, Font, ClientRectangle, text,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
-            TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        if (Image != null)
+        {
+            DrawIcon(g);
+        }
+        else
+        {
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, text,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
+                TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        }
 
         if (Focused && ShowFocusCues)
         {
@@ -149,6 +156,137 @@ internal class RoundedButton : Button
             using var ringPen = new Pen(Theme.Navy, 1.5f);
             g.DrawPath(ringPen, ring);
         }
+    }
+
+    /// <summary>The usual height of a picture on a button, in pixels at 100% (as high as the text of a normal button).</summary>
+    internal const int DefaultIconHeight = 18;
+
+    /// <summary>The height of the picture on this button (the print icon), in pixels at 100%.</summary>
+    internal int IconHeight = DefaultIconHeight;
+
+    /// <summary>
+    /// A button with a picture (Image) instead of a text: the picture in the middle, <see cref="IconHeight"/> high with its
+    /// own proportions. A button that cannot be pressed shows it pale, like the pale text of the other buttons.
+    /// </summary>
+    private void DrawIcon(Graphics g)
+    {
+        float height = LogicalToDeviceUnits(IconHeight);
+        float width = height * Image!.Width / Image.Height;
+        var place = new RectangleF((Width - width) / 2, (Height - height) / 2, width, height);
+
+        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        if (Enabled)
+        {
+            g.DrawImage(Image, place);
+            return;
+        }
+
+        using var pale = new System.Drawing.Imaging.ImageAttributes();
+        pale.SetColorMatrix(new System.Drawing.Imaging.ColorMatrix { Matrix33 = 0.3f }); // 30% opaque
+        g.DrawImage(Image, Rectangle.Round(place), 0, 0, Image.Width, Image.Height, GraphicsUnit.Pixel, pale);
+    }
+}
+
+/// <summary>
+/// The vertical line between the two columns, as a handle that can be dragged with the mouse (Daan, 2026-10-25: "make it
+/// possible to move the vertical divider"). The control is as wide as the room around the line (20 px on each side at
+/// 100%), so it is easy to grab; only the thin line in the middle is drawn, a little thicker and darker while the mouse is
+/// on it. The window decides what dragging does: it gets the mouse position and sets the column widths.
+/// </summary>
+internal class ColumnSplitter : Control
+{
+    /// <summary>The width of the handle at 100%: 20 px room + the 1 px line + 20 px room.</summary>
+    public const int HandleWidth = 41;
+
+    private bool _hover;
+    private bool _dragging;
+
+    /// <summary>While dragging: the mouse position, as X in the coordinates of the parent (the table with the columns).</summary>
+    public event Action<int>? Dragged;
+
+    /// <summary>The mouse button was released after dragging.</summary>
+    public event Action? Released;
+
+    /// <summary>A double-click: back to two equal halves.</summary>
+    public event Action? ResetRequested;
+
+    public ColumnSplitter()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        Cursor = Cursors.VSplit;
+        TabStop = false;
+    }
+
+    protected override void OnMouseEnter(EventArgs e)
+    {
+        _hover = true;
+        Invalidate();
+        base.OnMouseEnter(e);
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        _hover = false;
+        Invalidate();
+        base.OnMouseLeave(e);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            _dragging = true;
+            Capture = true; // keep getting the mouse, also when it is moved faster than the line follows
+        }
+
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (_dragging)
+        {
+            Dragged?.Invoke(Left + e.X);
+        }
+
+        base.OnMouseMove(e);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        if (_dragging)
+        {
+            _dragging = false;
+            Capture = false;
+            Invalidate();
+            Released?.Invoke();
+        }
+
+        base.OnMouseUp(e);
+    }
+
+    protected override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            ResetRequested?.Invoke();
+        }
+
+        base.OnMouseDoubleClick(e);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.Clear(FluentDrawing.BehindColor(this));
+
+        // At rest the same thin pale-blue line as the horizontal dividers; under the mouse thicker and darker, so it is
+        // clear that it can be moved.
+        bool active = _hover || _dragging;
+        int thickness = active ? LogicalToDeviceUnits(3) : 1;
+        using var line = new SolidBrush(active ? Theme.LightBlue : Theme.PaleBlue);
+        g.FillRectangle(line, (Width - thickness) / 2, 0, thickness, Height);
     }
 }
 
