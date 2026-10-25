@@ -15,7 +15,7 @@ internal static class Strings
     public const string CompanyName = "ROGIERS NV/SA";
     public const string CompanyUrl = "https://www.rogiers.be/";
     public const string CreditSeparator = " | ";  // between the credit and the app version, top right
-    public const string UserGuideUrl = "https://github.com/Ruu-D/TsDssConverter"; // opened by the user-guide icon (TODO: own page)
+    public const string UserGuideUrl = "https://github.com/Ruu-D/DssLabelTemplate/"; // opened by the user-guide icon: the GitHub page of this tool
 
     /// <summary>The line below the program name in the banner. English in every language, like the banner of TsDssConverter.</summary>
     public const string BannerSubtitle = "Visualize and manually edit label files for a Duivestein system";

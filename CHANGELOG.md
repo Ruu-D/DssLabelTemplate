@@ -1,5 +1,11 @@
 # Changelog
 
+## Not released yet
+
+- README: the banner of the window at the top (`media\header.png`, written by `--write-icon media` from the same code as
+  the window) and Daan's screenshot `media\Main-UI.png`.
+- The user-guide icon opens this tool's own GitHub page, https://github.com/Ruu-D/DssLabelTemplate/ (was TsDssConverter's).
+
 ## 1.0.0 — 2026-10-25 (first release)
 
 - Version 0.5.0, checked by Daan, with a grey editor background `#E8E8E8` (`Theme.XmlBackground`; `#A0A0A0` was too dark to read the tags, a test checks the contrast now).

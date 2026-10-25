@@ -113,7 +113,8 @@ internal static class AppLogo
 }
 
 /// <summary>
-/// Writes media\app.ico (and the big PNG versions) from <see cref="AppLogo"/>. Run it after changing the logo:
+/// Writes media\app.ico (and the big PNG versions) from <see cref="AppLogo"/>, and media\header.png (the banner of the
+/// window, for the README). Run it after changing the logo or the banner:
 ///   dotnet run --project src/DssLabelTemplate -- --write-icon media
 /// then build again (app.ico is built into the exe).
 /// </summary>
@@ -132,6 +133,10 @@ internal static class IconFileWriter
             using Bitmap picture = AppLogo.Render(size);
             picture.Save(Path.Combine(folder, $"icon-{size}.png"), ImageFormat.Png);
         }
+
+        // The banner exactly as the window draws it (1080 x 168: twice 540 x 84, sharp on GitHub's high-DPI screens).
+        using Image banner = AppIcons.Banner();
+        banner.Save(Path.Combine(folder, "header.png"), ImageFormat.Png);
     }
 
     /// <summary>

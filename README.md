@@ -1,4 +1,4 @@
-# DssLabelTemplate
+<h1 align="center"><img src="media/header.png" width="540" alt="DssLabelTemplate - Visualize and manually edit label files for a Duivestein system"></h1>
 
 A small Windows tool to **visualize and manually edit label files for a Duivestein system**.
 Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (which writes the label CSV files for the Duivestein warehouse).
@@ -14,6 +14,8 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 - Dutch, French and English interface. Files are saved back in their own encoding and line endings.
 - Installed by copying the exe to `C:\DssLabelTemplate`. That folder also holds `settings.json` and, from the first start,
   the example files in `labels\` and `CSV examples\`.
+
+![The main window of DssLabelTemplate: the label files at the top, the template text on the left, the label preview on the right](media/Main-UI.png)
 
 ## Status
 
@@ -38,7 +40,7 @@ its top-left corner.
 
 1. The real label size (mm) and a printed label to compare the preview with.
 2. Real templates, to be copied from a working Duivestein system later.
-3. Own user-guide page [link to GitHub repo].
+3. ~~Own user-guide page.~~ Done: the user-guide icon at the top right opens this GitHub page.
 
 
 Developer: Daan Verhoost — ROGIERS NV/SA.
