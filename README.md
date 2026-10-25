@@ -1,7 +1,7 @@
 # DssLabelTemplate
 
 A small Windows tool to **visualize and manually edit label files for a Duivestein system**.
-Sister tool of **TsDssConverter** (which writes the label CSV files for the Duivestein warehouse); it uses the same look.
+Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (which writes the label CSV files for the Duivestein warehouse); it uses the same look.
 
 - **One single `.exe`**, no installer, no .NET installation needed, no Excel/Office.
 - Opens the two kinds of Duivestein label files (DSS Software Interface v1.7):
