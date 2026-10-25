@@ -1,20 +1,17 @@
 # Changelog
 
-## Not released yet
-
-- README: the banner of the window at the top (`media\header.png`, written by `--write-icon media` from the same code as
-  the window) and Daan's screenshot `media\Main-UI.png`.
-- The user-guide icon opens this tool's own GitHub page, https://github.com/Ruu-D/DssLabelTemplate/ (was TsDssConverter's).
-
 ## 1.0.0 — 2026-10-25 (first release)
 
 - Version 0.5.0, checked by Daan, with a grey editor background `#E8E8E8` (`Theme.XmlBackground`; `#A0A0A0` was too dark to read the tags, a test checks the contrast now).
+- The user-guide icon opens this tool's own GitHub page, https://github.com/Ruu-D/DssLabelTemplate/ (was TsDssConverter's).
+- README: the banner of the window at the top (`media\header.png`, written by `--write-icon media` from the same code as
+  the window) and Daan's screenshot `media\Main-UI.png`.
 - Pushed to GitHub by Daan.
-- Delivery: `dist\v1.0.0\DssLabelTemplate.exe`, 53,119,254 bytes, file version 1.0.0.0, SHA-256
-  `5df2ec249fe0305b5a4b4d7109c13146493aae5cd96a0bfd5cfbe854ecf7f607`. Started once with `--data` on an empty folder: it
-  writes settings.json and the 5 examples, and closes cleanly. (The first publish under 1.0.0 still had version 0.5.0.0
-  inside: the PC clock had gone back, so the old generated version file in `obj\` looked newer than the csproj. Clean
-  `obj\` + `bin\` builds fixed it.)
+- Delivery (rebuilt with the GitHub link, on Daan's request under the same number): `dist\v1.0.0\DssLabelTemplate.exe`,
+  53,119,368 bytes, file version 1.0.0.0, SHA-256 `766202f7c658e9baac88984d0dd9ac8ce22da91331331542e1a04d18bbd1dc4b`.
+  The build before it (`5df2ec24…`) still opened TsDssConverter's page. (The very first publish under 1.0.0 still had
+  version 0.5.0.0 inside: the PC clock had gone back, so the old generated version file in `obj\` looked newer than the
+  csproj. Clean `obj\` + `bin\` builds fixed it.)
 
 ## 0.5.0 — 2026-10-25 (step 5)
 
