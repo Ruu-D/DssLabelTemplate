@@ -38,9 +38,7 @@ its top-left corner.
 
 ## Open questions
 
-1. The real label size (mm) and a printed label to compare the preview with.
+1. The real label size (mm) and a printed label to compare the preview with. Real-life printed labels can also determine if the label preview is rendered correctly.
 2. Real templates, to be copied from a working Duivestein system later.
-3. ~~Own user-guide page.~~ Done: the user-guide icon at the top right opens this GitHub page.
-
 
 Developer: Daan Verhoost — ROGIERS NV/SA.
