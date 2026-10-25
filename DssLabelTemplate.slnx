@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DssLabelTemplate/DssLabelTemplate.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DssLabelTemplate.Tests/DssLabelTemplate.Tests.csproj" />
+  </Folder>
+</Solution>

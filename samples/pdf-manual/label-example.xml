@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DSSPrintJob Length="2800" Width="2100">
+  <PrintLabel ID="5436280" X="500" Y="1000">
+    <Image X="6" Y="6" X2="94" Y2="33">C:\DSS\DUIVESTEIN-LOGO.bmp</Image>
+    <Line X="5" Y="45" X2="95" Y2="45" />
+    <Text X="7" Y="47" FontSize="10" Font="Arial">Materiaal :</Text>
+    <Text X="30" Y="47" FontSize="10" Font="Arial">MDF_D18</Text>
+    <Text X="7" Y="52" FontSize="10" Font="Arial">Afmetingen :</Text>
+    <Text X="30" Y="52" FontSize="10" Font="Arial">280 x 421 x 18</Text>
+    <Text X="7" Y="57" FontSize="10" Font="Arial">Project :</Text>
+    <Text X="30" Y="57" FontSize="10" Font="Arial">BEURS2017 / 001.A</Text>
+    <Text X="7" Y="62" FontSize="10" Font="Arial">Klant :</Text>
+    <Text X="30" Y="62" FontSize="10" Font="Arial">Kerssemakers</Text>
+    <Line X="5" Y="69" X2="95" Y2="69" />
+    <Text X="7" Y="71" FontSize="10" Font="Arial">Datum / Tijd :</Text>
+    <Text X="30" Y="71" FontSize="10" Font="Arial">$DATE$ / $TIME$</Text>
+    <Barcode X="5" Y="80" Width="90" Rotation="0"
+      Type="BARCODE128A" Size="7" Height="15">13579-houtproplus24680</Barcode>
+  </PrintLabel>
+  <PrintLabel ID="5436281" X="650" Y="300">
+    <Image X="6" Y="6" X2="94" Y2="33">C:\DSS\DUIVESTEIN-LOGO.bmp</Image>
+    <Line X="5" Y="45" X2="95" Y2="45" />
+    <Text X="7" Y="47" FontSize="10" Font="Arial">Materiaal :</Text>
+    <Text X="30" Y="47" FontSize="10" Font="Arial">MDF_D18</Text>
+    <Text X="7" Y="52" FontSize="10" Font="Arial">Afmetingen :</Text>
+    <Text X="30" Y="52" FontSize="10" Font="Arial">680 x 800 x 18</Text>
+    <Text X="7" Y="57" FontSize="10" Font="Arial">Project :</Text>
+    <Text X="30" Y="57" FontSize="10" Font="Arial">BEURS2017 / 001.A</Text>
+    <Text X="7" Y="62" FontSize="10" Font="Arial">Klant :</Text>
+    <Text X="30" Y="62" FontSize="10" Font="Arial">Kerssemakers</Text>
+    <Line X="5" Y="69" X2="95" Y2="69" />
+    <Text X="7" Y="71" FontSize="10" Font="Arial">Datum / Tijd :</Text>
+    <Text X="30" Y="71" FontSize="10" Font="Arial">$DATE$ / $TIME$</Text>
+    <Barcode X="5" Y="80" Width="90" Rotation="0"
+      Type="BARCODE128A" Size="7" Height="15">13579-houtproplus53210</Barcode>
+  </PrintLabel>
+</DSSPrintJob>

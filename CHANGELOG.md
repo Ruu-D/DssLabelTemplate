@@ -1,0 +1,95 @@
+# Changelog
+
+## 1.0.0 — 2026-10-25 (first release)
+
+- Version 0.5.0, checked by Daan, with a grey editor background `#E8E8E8` (`Theme.XmlBackground`; `#A0A0A0` was too dark to read the tags, a test checks the contrast now).
+- Pushed to GitHub by Daan.
+- Delivery: `dist\v1.0.0\DssLabelTemplate.exe`, 53,119,254 bytes, file version 1.0.0.0, SHA-256
+  `5df2ec249fe0305b5a4b4d7109c13146493aae5cd96a0bfd5cfbe854ecf7f607`. Started once with `--data` on an empty folder: it
+  writes settings.json and the 5 examples, and closes cleanly. (The first publish under 1.0.0 still had version 0.5.0.0
+  inside: the PC clock had gone back, so the old generated version file in `obj\` looked newer than the csproj. Clean
+  `obj\` + `bin\` builds fixed it.)
+
+## 0.5.0 — 2026-10-25 (step 5)
+
+- The source code moved to `C:\Dev\DssLabelTemplate` (Daan).
+- **Program folder `C:\DssLabelTemplate`** (Daan): `settings.json` is there (was `%APPDATA%\DssLabelTemplate`) and is
+  written at the first start, with two example folders: `labels\` (the xml files of `samples\pdf-manual`) and
+  `CSV examples\` (its csv). The examples are built into the exe and written only when their folder does not exist yet
+  (`AppDataFolder.cs`). `--data <folder>` still points everything elsewhere.
+- **Tab order** (Daan): Tab only goes through template path → csv path → label length → label width; entering a field
+  (Tab or click) selects all its text, so typing replaces it.
+- **Two separate file lines** (Daan: no more second dialog asking for the other file): `Template of label-xml:` and
+  `Label-csv:`, each with its own Browse. The csv can be chosen before or after the template; another template keeps the
+  csv; a label-xml closes it and greys out the csv line; an empty csv box + Enter = the template without data. The Browse
+  dialogs start in the example folders. Section title `Labelbestanden`, description and status texts adapted.
+- **Editor background grey** (Daan): `Theme.XmlBackground` (first `#F3F3F3`), also inside the rounded frame.
+- 117 tests.
+- First delivery build (before the grey background): `dist\v0.5.0\DssLabelTemplate.exe`, 53,119,197 bytes, SHA-256
+  `4fd129236462fbed57f404a2eb44cba69f06e84790bc02a57292926f54413da6`. Started once with `--data` on an empty folder: it
+  wrote settings.json, `labels\` (4 xml) and `CSV examples\` (1 csv).
+
+## 0.4.0 — 2026-10-25 (step 4)
+
+- **XML editor with colours** (Daan): the plain text box is replaced by Scintilla (NuGet `Scintilla5.NET` 7.1.1, MIT, the
+  editor of Notepad++), approved by Daan. Tags, attribute names, values and comments in palette colours, line numbers,
+  a brand-blue box around every `$VARIABLE$`; opening a file cannot be undone with Ctrl+Z (`XmlEditor.cs`).
+- The exe stays ONE file: the two native Scintilla DLLs are built into it and written once to
+  `%LOCALAPPDATA%\DssLabelTemplate\scintilla\<hash>\` at start (`ScintillaFiles.cs`); the loose copies of the package are kept
+  out of the publish folder. Checked by starting the published exe.
+- **View of the loaded csv** (Daan): with a label-csv, two buttons above the left column, `Template (xml)` / `Label-csv`,
+  switch between the editor and a read-only table of the csv (`#` + its columns). The table and the arrows follow each
+  other: the arrows select the label's row, clicking a row shows that label.
+- The column titles next to buttons are always one line ("…" when too long): the French csv title wrapped at first.
+- `RoundedFrame` (shared by `TextBoxFrame` and the new `ContentFrame`); `Theme.Xml*` colours and `StyleToggleButton`.
+- 101 tests.
+- Delivery: `dist\v0.4.0\DssLabelTemplate.exe`, 53,115,797 bytes, SHA-256
+  `d086c1fd1a8fb151b476b81eb81388e0aee6dd702415eeebd81cbb3cb09f5ac8`.
+
+## 0.3.0 — 2026-10-24 (step 3)
+
+- **Label size fields** (Daan): `Labelformaat (mm): [100] × [100]` on the status line, against the right edge in line with
+  Browse. Length = horizontal (X), width = vertical (Y), 1 – 1000 mm, dot or comma; saved in settings.json
+  (`LabelLength`, `LabelWidth`, default 100 × 100; an impossible value in the file is back to 100). An invalid entry turns
+  red and the last valid size stays.
+- The preview draws the paper at that size (before: 100 × 100, growing with the objects). Objects that stick out are still
+  drawn on the pale blue around it, and a red line says how many objects are (partly) outside the label.
+- 85 tests.
+- Delivery: `dist\v0.3.0\DssLabelTemplate.exe`, 51,795,676 bytes, SHA-256
+  `4483732c8db1a30a0528775c770b61f0d7fd3a3c4e2b36e5ca8614e85a34f4ff`.
+
+## 0.2.0 — 2026-10-24 (step 2)
+
+Daan's 6 requests after checking 0.1.0, based on Duivestein's "DSS Software Interface v1.7" (2024-11-08):
+- **Own logo** (Claude's design): a white label with a QR-code-like pattern and a peeled corner, drawn in code
+  (`AppLogo.cs`). It replaces TsDssConverter's icon in the banner and in `media\app.ico` (16 – 256 px, written with
+  `--write-icon media`; also `icon-256.png`, `icon-512.png`). `header@2x.png` and `app-icon.svg` of TsDssConverter removed.
+- **Banner subtitle**: "Visualize and manually edit label files for a Duivestein system".
+- **The examples of the PDF as test data** in `samples/pdf-manual/`: label-csv + template (p. 26, the template's typo
+  `Width="$WIDTH$""` corrected) and the label-xml (p. 27).
+- **Only label files can be opened**: Browse offers `*.csv` (label-csv; then the template is asked) and `*.xml` (label-xml,
+  or a template; then its label-csv is asked, Cancel = without data). The same for a typed path and the command line.
+  The last xml + csv are opened again at start (`LastCsvFile` in settings.json).
+- **Description of the two kinds** below "Labeltemplate (bestand)", and a status line below the path box.
+- **Arrows** ◀ ▶ with "2 / 3" next to "Voorbeeld van het label", against the right edge of the preview, when there is more
+  than one label (a label-xml of a sheet, or a template with a csv of several lines — the merged labels have several IDs too).
+- The preview draws the labels: Text, Line, Rectangle, Image (placeholder when the picture is not on this PC), Barcode
+  (drawn as Code 128 B), QRCode (a QR-looking pattern), Arrow (8 directions, 8 fills), with an info line (ID, X, Y,
+  rotation, sheet size), a red line for objects that cannot be drawn (with their line number) and a small sheet map.
+  Assumptions where the manual is silent: see CLAUDE.md §7 (label 100 x 100 mm, counter-clockwise rotation, …).
+- Disabled look for `RoundedButton`. 74 tests.
+- Delivery: `dist\v0.2.0\DssLabelTemplate.exe`, 51,793,947 bytes, SHA-256
+  `c1c8a937165f1b7b8539196135ac387862cf35278f0360dd306ce2b669c4e5b5`.
+
+## 0.1.0 — 2026-10-24 (step 1)
+
+- New project, started from the look of TsDssConverter 1.1.0's settings window (banner, top row with language, credit,
+  version and user-guide icon, footer with logo, `Theme`, `FluentControls`, 940 x 780 window). The conversion, tray and CLI
+  code of TsDssConverter were not taken over.
+- Row 1: template file (path box, Enter opens, Browse). Row 2: text editor (Consolas, no word wrap) and a preview panel
+  (placeholder until the template format is known).
+- Open / Save (Ctrl+O / Ctrl+S) with the encoding and line endings of the file kept; unsaved-changes question; `*` in the
+  title; the last file is opened again at start.
+- Banner drawn in code with the name `DssLabelTemplate` (the picture of TsDssConverter has its name in it).
+- Settings (`Language`, `LastFile`) in `%APPDATA%\DssLabelTemplate\settings.json`.
+- `publish.cmd`: one self-contained `DssLabelTemplate.exe`. 30 tests.

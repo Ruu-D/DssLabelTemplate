@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DSSPrintJob Length="$LENGTH$" Width="$WIDTH$">
+  <PrintLabel ID="$ID$" X="$XPOS$" Y="$YPOS$" ROTATION="$ROTATION$">
+    <Line X="10" Y="10" X2="90" Y2="10"/>
+    <Line X="90" Y="10" X2="90" Y2="90"/>
+    <Line X="10" Y="10" X2="10" Y2="90"/>
+    <Line X="90" Y="90" X2="10" Y2="90"/>
+    <Text X="12" Y="12" FontSize="10" >CLIENT:</Text>
+    <Text X="29" Y="12" Style="BOLD">$PROJECT$</Text>
+    <Text X="12" Y="18" FontSize="10" >PIECE:</Text>
+    <Text X="29" Y="18" FontSize="10" Style="BOLD">$DESCRIPTION$</Text>
+    <Text X="12" Y="27" FontSize="10" >DIM.:</Text>
+    <Text X="24" Y="27" FontSize="10" >$X$</Text>
+    <Text X="38" Y="27" FontSize="10" >x</Text>
+    <Text X="48" Y="27" FontSize="10" >$Y$</Text>
+    <Text X="12" Y="37" FontSize="10" >MATIERE:</Text>
+    <Text X="32" Y="37" Style="BOLD">$MATERIAL$</Text>
+    <Text X="12" Y="50" FontSize="10" >REMARQUE:</Text>
+    <Text X="12" Y="55" FontSize="10" >$DESC2$</Text>
+    <Image X="75" Y="23" X2="87" Y2="13" >C:\DssLabelTemplate\HP-logo.png</Image>
+    <Text X="76" Y="69" FontSize="10" >CAM2:</Text>
+    <QRCode X="73" Y="74" Width="13" Height="13" Type="AUTO">$CAM2$</QRCode>
+    <Text X="46" Y="5" FontSize="8" >$EDGE_L1$</Text>
+    <Text X="46" Y="92" FontSize="8" >$EDGE_L2$</Text>
+    <Text X="5" Y="52" FontSize="8" Rotation="90" >$EDGE_B1$</Text>
+    <Text X="92" Y="52" FontSize="8" Rotation="90" >$EDGE_B2$</Text>
+  </PrintLabel>
+</DSSPrintJob>

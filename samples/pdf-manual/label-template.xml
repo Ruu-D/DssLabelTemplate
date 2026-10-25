@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DSSPrintJob Length="$LENGTH$" Width="$WIDTH$">
+  <PrintLabel ID="$ID$" X="$XPOS$" Y="$YPOS$" ROTATION="$ROTATION$">
+    <Line X="70" Y="15" X2="70" Y2="90"/>
+    <Text X="10" Y="15">Project:</Text>
+    <Text X="25" Y="15" Style="BOLD">$ORDERNO$</Text>
+    <Text X="10" Y="25">Size:</Text>
+    <Text X="25" Y="25">$PW$</Text>
+    <Text X="45" Y="25">x</Text>
+    <Text X="65" Y="25">$PH$</Text>
+    <Line X="10" Y="58" X2="70" Y2="58"/>
+    <Image X="10" Y="75" X2="70" Y2="90" >C:\Dev\TsDssConverter\media\header@2x.png</Image>
+    <Barcode X="75" Y="10" Width="70" Height="15" Size="2" Type="BARCODE128A" Rotation="270">$BARCODE1$</Barcode>
+    <Arrow X="75" Y="75" X2="90" Y2="90" Direction="7" Weight="2" FillStyle="7" />
+  </PrintLabel>
+</DSSPrintJob>

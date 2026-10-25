@@ -1,0 +1,1373 @@
+namespace DssLabelTemplate;
+
+/// <summary>
+/// The only window of the program. Same look as the settings window of TsDssConverter (banner, language and credit at
+/// the top, logo and buttons at the bottom), with in between:
+///   row 1 (low):  the two label files, each with a path box and a Browse button: the template or label-xml (shown in the
+///                 editor) and the label-csv (the data for a template). Above them what the two kinds of label files are,
+///                 below them a status line (which kind is open, how many labels) and the label size;
+///   row 2 (high): left the text of the label-xml or template (a simple Notepad), right the preview of one label, with
+///                 two arrows to go through the labels when there is more than one.
+/// The two kinds of files (DSS Software Interface, "Label"): a label-csv + a label template (the editor shows the template,
+/// the csv gives the data, one label per csv line), or a label-xml (all labels of one sheet in one file).
+/// The layout is built in code, so it can be read and reviewed like any other code.
+/// </summary>
+internal class MainForm : Form
+{
+    private readonly AppSettings _settings;
+    private readonly Action<AppSettings> _saveSettings;
+    private readonly string? _fileToOpen;
+    private readonly string? _dataFolder; // C:\DssLabelTemplate: the Browse dialogs start in its example folders
+
+    // The banner picture is 540 x 84 pixels. It is shown 1.2 times as big (the same as TsDssConverter).
+    private const int BannerWidth = 648;
+    private const int BannerHeight = 101;
+
+    // The size of the window when it opens, at 100% (the same as the settings window of TsDssConverter).
+    private const int WindowWidth = 940;
+    private const int WindowHeight = 780;
+
+    // All buttons have exactly this size (at 100%), so they line up and look the same.
+    private static readonly Size ButtonSize = new(100, 28);
+
+    // The two arrows next to the preview title: as high as the other buttons, narrow.
+    private static readonly Size ArrowButtonSize = new(36, 28);
+
+    // The two fields of the label size: as high as the buttons, room for "1000,5".
+    private static readonly Size LabelSizeBoxSize = new(60, 28);
+
+    // The two buttons above the left column (template / csv): wide enough for "CSV d'étiquettes" (a test checks all languages).
+    private static readonly Size ViewButtonSize = new(120, 28);
+
+    // The company logo in the footer and the user-guide icon next to the app version (at 100%).
+    private static readonly Size LogoSize = new(35, 32);
+    private static readonly Size UserGuideIconSize = new(16, 16);
+
+    // The preview follows the text this long after the last key press (not after every letter).
+    private const int PreviewDelayMilliseconds = 300;
+
+    // The controls we need to read or fill (internal: the tests check them)
+    internal readonly PictureBox BannerPicture = new();
+    internal readonly Label LanguageCaption = new();
+    internal readonly ComboBox LanguageBox = new();
+    internal readonly Label CreditLabel = new();
+    internal readonly Label VersionLabel = new();
+    internal readonly PictureBox UserGuidePicture = new();
+    internal readonly Label FileCaption = new();
+    internal readonly Label FileDescription = new(); // the two kinds of label files, below the caption
+    internal readonly Label XmlFileCaption = new();  // "Template of label-xml:"
+    internal readonly TextBox XmlFileBox = new();    // the path of the file in the editor
+    internal readonly RoundedButton XmlBrowseButton = new();
+    internal readonly Label CsvFileCaption = new();  // "Label-csv:"
+    internal readonly TextBox CsvFileBox = new();    // the path of the label-csv with the data for a template
+    internal readonly RoundedButton CsvBrowseButton = new();
+    internal readonly Label FileStatus = new();      // what is open: label-xml / template + csv, and how many labels
+    internal readonly Label LabelSizeCaption = new(); // "Labelformaat (mm):", right of the status line
+    internal readonly TextBox LabelLengthBox = new(); // the label length in mm (horizontal, X)
+    internal readonly TextBox LabelWidthBox = new();  // the label width in mm (vertical, Y)
+    internal readonly TableLayoutPanel LabelSizePanel = new(); // the caption and the two fields, against the right edge
+    internal readonly Label EditorCaption = new();
+    internal readonly RoundedButton XmlViewButton = new(); // shows the template text (only visible with a label-csv)
+    internal readonly RoundedButton CsvViewButton = new(); // shows the csv data as a table
+    internal readonly TableLayoutPanel EditorHeader = new(); // the editor title with the two view buttons
+    internal readonly Panel EditorArea = new();             // holds the editor and the csv table, one of them visible
+    internal readonly DataGridView CsvGrid = new();         // the label-csv, read-only, one row per label
+    internal readonly Label PreviewCaption = new();
+    internal readonly Label LabelCounter = new();    // "2 / 3", left of the arrows
+    internal readonly RoundedButton PreviousButton = new();
+    internal readonly RoundedButton NextButton = new();
+    internal readonly TableLayoutPanel PreviewHeader = new(); // the preview title with the counter and the arrows
+    internal readonly XmlEditor Editor = new();
+    internal readonly LabelPreview Preview = new();
+    internal readonly Panel ColumnDivider = new();   // the vertical line between the editor and the preview
+    internal readonly List<Panel> Dividers = new();  // the horizontal lines
+    internal readonly PictureBox LogoPicture = new();
+    internal readonly RoundedButton SaveButton = new();
+    internal readonly RoundedButton CloseButton = new();
+
+    private readonly ToolTip _toolTip = new();
+    private readonly System.Windows.Forms.Timer _previewTimer = new() { Interval = PreviewDelayMilliseconds };
+
+    // The open file. Null = nothing opened yet (Save then asks for a name).
+    private string? _currentFile;
+    private TextFileContent? _loaded;   // how the file was written (encoding, line endings), to save it the same way
+    private bool _modified;             // changed since it was opened or saved
+    private bool _loading;              // filling the editor from a file: that is not a change by the user
+    private LabelCsv? _csv;             // the label-csv that goes with the template in the editor; null for a label-xml
+    private bool _isLabelXml;           // the editor holds a valid label-xml: then a label-csv is not used
+    private Control? _fileRow;          // the rows with the path boxes: the texts above and below get their width (FitFileTexts)
+    private bool _showingCsv;           // the left column shows the csv table instead of the template text
+    private bool _selectingCsvRow;      // the program (not the user) selects a row of the csv table
+
+    /// <summary>Internal: the file that is open now (the tests check it).</summary>
+    internal string? CurrentFile => _currentFile;
+
+    /// <summary>Internal: true when the left column shows the csv table.</summary>
+    internal bool ShowingCsv => _showingCsv;
+
+    /// <summary>Internal: the label-csv that goes with the template, or null.</summary>
+    internal string? CurrentCsvFile => _csv?.FilePath;
+
+    /// <summary>Internal: true when the text has changed since it was opened or saved.</summary>
+    internal bool IsModified => _modified;
+
+    /// <summary>One line of the language box: the language and the text that is shown for it.</summary>
+    internal class LanguageItem
+    {
+        public AppLanguage Language { get; }
+        public string Text { get; }
+
+        public LanguageItem(AppLanguage language, string text)
+        {
+            Language = language;
+            Text = text;
+        }
+
+        public override string ToString() => Text; // what the ComboBox shows
+    }
+
+    /// <param name="settings">The settings in use (language, last file). The window changes them and calls saveSettings.</param>
+    /// <param name="saveSettings">Saves the settings. May throw IOException / UnauthorizedAccessException.</param>
+    /// <param name="fileToOpen">A file given on the command line (or dropped on the exe); null = the last file.</param>
+    /// <param name="dataFolder">The folder with the example folders (C:\DssLabelTemplate); null = none (the tests).</param>
+    public MainForm(AppSettings settings, Action<AppSettings> saveSettings, string? fileToOpen, string? dataFolder = null)
+    {
+        _settings = settings;
+        _saveSettings = saveSettings;
+        _fileToOpen = fileToOpen;
+        _dataFolder = dataFolder;
+
+        // Like a form made with the Visual Studio designer: build everything between SuspendLayout and
+        // ResumeLayout. WinForms applies the automatic scaling (for 125%, 150%, ...) when the layout resumes.
+        SuspendLayout();
+        BuildWindow();
+        ResumeLayout(performLayout: true);
+
+        LanguageBox.SelectedIndex = (int)Localizer.Current; // the list is in the order of the enum
+        LanguageBox.SelectedIndexChanged += (sender, e) => ChangeLanguage();
+        ApplyTexts();
+
+        // The label size of the last time; the handlers come after, so filling the fields does not save anything.
+        LabelLengthBox.Text = LabelXml.Format(_settings.LabelLength);
+        LabelWidthBox.Text = LabelXml.Format(_settings.LabelWidth);
+        Preview.LabelSize = new SizeF((float)_settings.LabelLength, (float)_settings.LabelWidth);
+        LabelLengthBox.TextChanged += (sender, e) => OnLabelSizeChanged(LabelLengthBox);
+        LabelWidthBox.TextChanged += (sender, e) => OnLabelSizeChanged(LabelWidthBox);
+
+        _previewTimer.Tick += (sender, e) => RefreshPreview(newFile: false);
+        RefreshPreview(newFile: true);
+    }
+
+    // ------------------------------------------------------------------ building the window
+
+    private void BuildWindow()
+    {
+        // Scaling: all sizes below are written for a screen at 100% (96 dpi) and are multiplied by the screen
+        // scaling (125%, 150%, ...). WinForms only does this if the window is built between SuspendLayout and
+        // ResumeLayout (see the constructor).
+        AutoScaleDimensions = new SizeF(96F, 96F);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        Font = Theme.CreateBodyFont(); // the Windows 11 font; all controls below inherit it
+        Icon = AppIcons.ForWindow();
+        BackColor = Theme.White;
+        ForeColor = Theme.Navy;
+        StartPosition = FormStartPosition.CenterScreen;
+        ClientSize = new Size(WindowWidth, WindowHeight);
+        MinimumSize = new Size(BannerWidth + 30, 500);
+
+        // Top: the banner, on the brand colour (the banner picture has the same background).
+        var banner = new Panel { Dock = DockStyle.Top, Height = BannerHeight, BackColor = Theme.Brand };
+        BannerPicture.Image = AppIcons.Banner();
+        BannerPicture.SizeMode = PictureBoxSizeMode.Zoom;
+        BannerPicture.Dock = DockStyle.Left;
+        BannerPicture.Width = BannerWidth;
+        BannerPicture.BackColor = Theme.Brand;
+        banner.Controls.Add(BannerPicture);
+
+        // Below: one table with a row per part. Only the two columns (row 2) grow with the window.
+        var body = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(20, 4, 20, 20), // left, top, right, bottom: the room below the buttons is as wide as at the sides
+            ColumnCount = 1,
+            BackColor = Theme.White,
+        };
+        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        int row = 0;
+
+        // The top row: the language on the left; the credit, the app version and the user-guide icon on the right.
+        var topRow = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        topRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        topRow.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        topRow.Controls.Add(BuildLanguageColumn(), 0, 0);
+        topRow.Controls.Add(BuildCredits(), 1, 0);
+        AddRow(body, ref row, topRow);
+        AddDivider(body, ref row, new Padding(0, 12, 0, 12));
+
+        // Row 1: the label file: the caption, what the two kinds of files are, the path box, and what is open now.
+        FileCaption.AutoSize = true;
+        FileCaption.Margin = new Padding(0, 8, 0, 2);
+        FileCaption.Font = new Font(Font, FontStyle.Bold);
+        AddRow(body, ref row, FileCaption);
+
+        // These two texts get their size from the window (FitFileTexts), never from the table: see TsDssConverter's
+        // "layout rules learned the hard way" (a table that wraps a label itself kept rows ten lines high at 125% / 150%).
+        FileDescription.AutoSize = false;
+        FileDescription.Margin = new Padding(0, 0, 0, 6);
+        FileDescription.ForeColor = Theme.Navy;
+        AddRow(body, ref row, FileDescription);
+
+        _fileRow = BuildFileRows();
+        AddRow(body, ref row, _fileRow);
+
+        AddRow(body, ref row, BuildStatusRow());
+
+        _fileRow.SizeChanged += (sender, e) => FitFileTexts();
+        LabelSizePanel.SizeChanged += (sender, e) => FitFileTexts();
+        FileDescription.FontChanged += (sender, e) => FitFileTexts(); // the window moved to a screen with another scaling
+        AddDivider(body, ref row, new Padding(0, 16, 0, 12));
+
+        // Row 2: the editor and the preview. The only row that takes the rest of the height.
+        Control workspace = BuildWorkspace();
+        body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        body.Controls.Add(workspace, 0, row);
+        row++;
+
+        // The last row: the logo on the left, Save / Close on the right.
+        AddRow(body, ref row, BuildBottomRow());
+        body.RowCount = row;
+
+        // Docking: the control that is added LAST sits at the very top.
+        Controls.Add(body);
+        Controls.Add(banner);
+
+        SetUpTabOrder();
+    }
+
+    /// <summary>
+    /// Tab only goes through the four fields, in this order (Daan): the template / label-xml path, the label-csv path, the
+    /// label length and the label width, then back to the first. Every other control is left out (the buttons work with
+    /// the mouse, Ctrl+O and Ctrl+S; Tab in the editor is a tab character). Entering a field selects all its text, so
+    /// typing replaces it.
+    /// </summary>
+    private void SetUpTabOrder()
+    {
+        var fields = new List<Control> { XmlFileBox, CsvFileBox, LabelLengthBox, LabelWidthBox };
+        foreach (Control control in AllControls(this))
+        {
+            control.TabStop = fields.Contains(control);
+        }
+
+        // The order itself is the order in which the rows and fields were added (WinForms numbers the controls as they
+        // are added): top to bottom, left to right. A test checks it.
+        foreach (Control field in fields)
+        {
+            SelectAllWhenEntered((TextBox)field);
+        }
+    }
+
+    /// <summary>Every control in the window, also those inside tables and frames.</summary>
+    private static IEnumerable<Control> AllControls(Control parent)
+    {
+        foreach (Control child in parent.Controls)
+        {
+            yield return child;
+            foreach (Control grandChild in AllControls(child))
+            {
+                yield return grandChild;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tab (or a click) into the field selects its whole text. After a click it is done when the mouse button goes up:
+    /// the click itself puts the caret somewhere in the text. A drag with the mouse keeps the part the user selected.
+    /// </summary>
+    private static void SelectAllWhenEntered(TextBox box)
+    {
+        bool selectOnMouseUp = false;
+        box.Enter += (sender, e) =>
+        {
+            if (MouseButtons == MouseButtons.Left && box.ClientRectangle.Contains(box.PointToClient(Cursor.Position)))
+            {
+                selectOnMouseUp = true;
+            }
+            else
+            {
+                box.BeginInvoke(box.SelectAll); // after Windows has given the field the focus
+            }
+        };
+        box.MouseUp += (sender, e) =>
+        {
+            if (selectOnMouseUp && box.SelectionLength == 0)
+            {
+                box.SelectAll();
+            }
+
+            selectOnMouseUp = false;
+        };
+        box.Leave += (sender, e) => selectOnMouseUp = false;
+    }
+
+    /// <summary>The left part of the top row: the language title (in all three languages) and the language box.</summary>
+    private Control BuildLanguageColumn()
+    {
+        LanguageCaption.Text = Strings.LanguageTitle;
+        LanguageCaption.AutoSize = true;
+        LanguageCaption.Font = new Font(Font, FontStyle.Bold);
+        LanguageCaption.Margin = new Padding(0, 6, 0, 2);
+
+        LanguageBox.DropDownStyle = ComboBoxStyle.DropDownList; // choose from the list, no typing
+        LanguageBox.Items.Add(new LanguageItem(AppLanguage.Dutch, Strings.LanguageDutch));
+        LanguageBox.Items.Add(new LanguageItem(AppLanguage.French, Strings.LanguageFrench));
+        LanguageBox.Items.Add(new LanguageItem(AppLanguage.English, Strings.LanguageEnglish));
+        LanguageBox.Width = 260;
+        LanguageBox.Anchor = AnchorStyles.Left;
+        LanguageBox.ForeColor = Theme.Navy;
+        LanguageBox.Margin = new Padding(0, 0, 0, 8);
+
+        // One AutoSize column (a Percent column in an AutoSize table would shrink the drop-down).
+        var column = new TableLayoutPanel { ColumnCount = 1, RowCount = 2, AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top, Margin = new Padding(0) };
+        column.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        column.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        column.Controls.Add(LanguageCaption, 0, 0);
+        column.Controls.Add(LanguageBox, 0, 1);
+        return column;
+    }
+
+    /// <summary>The right part of the top row, against the right edge: "Dev.: Daan Verhoost | App version: 0.1.0" and the user-guide icon.</summary>
+    private Control BuildCredits()
+    {
+        CreditLabel.Text = Strings.DeveloperCredit;
+        CreditLabel.AutoSize = true;
+        CreditLabel.Margin = new Padding(0);
+        CreditLabel.ForeColor = Theme.Navy;
+
+        var separator = new Label { Text = Strings.CreditSeparator, AutoSize = true, Margin = new Padding(0), ForeColor = Theme.PaleBlue };
+
+        VersionLabel.AutoSize = true;
+        VersionLabel.Margin = new Padding(0);
+        VersionLabel.ForeColor = Theme.Navy;
+
+        var line = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoSize = true,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top,
+            Margin = new Padding(0, 6, 0, 8), // the same top margin as the language title, so both sit on one line
+        };
+
+        // Not higher than the text line; the top margin puts its middle on the middle of the letters.
+        UserGuidePicture.Image = AppIcons.UserGuide();
+        UserGuidePicture.SizeMode = PictureBoxSizeMode.Zoom;
+        UserGuidePicture.Size = UserGuideIconSize;
+        UserGuidePicture.BackColor = Theme.White;
+        UserGuidePicture.Margin = new Padding(10, 1, 0, 0);
+        UserGuidePicture.Cursor = Cursors.Hand;
+        UserGuidePicture.Click += (sender, e) => OpenWebsite(Strings.UserGuideUrl);
+
+        line.Controls.Add(CreditLabel);
+        line.Controls.Add(separator);
+        line.Controls.Add(VersionLabel);
+        line.Controls.Add(UserGuidePicture);
+        return line;
+    }
+
+    /// <summary>
+    /// Gives the description and the status line below and above the path box their size: as wide as that row, and as
+    /// high as the description needs at that width (the status line is one line, cut off with "…").
+    /// </summary>
+    private void FitFileTexts()
+    {
+        if (_fileRow == null || _fileRow.Width <= 0)
+        {
+            return; // still building the window: fitted when the row gets its width
+        }
+
+        int width = _fileRow.Width;
+        var description = new Size(width, FileDescription.GetPreferredSize(new Size(width, 0)).Height);
+        if (FileDescription.Size != description) // also stops the loop: a new height lays the table out again
+        {
+            FileDescription.Size = description;
+        }
+
+        // The status line takes what the label size leaves free. The size panel's PREFERRED width, not its current one:
+        // when the status line was too wide for a moment, the panel was squeezed (to 1 pixel) and would have stayed so.
+        int sizePanel = LabelSizePanel.GetPreferredSize(Size.Empty).Width + LabelSizePanel.Margin.Horizontal;
+        int free = width - sizePanel - FileStatus.Margin.Horizontal;
+        var status = new Size(Math.Max(0, free), FileStatus.PreferredHeight);
+        if (FileStatus.Size != status)
+        {
+            FileStatus.Size = status;
+        }
+    }
+
+    /// <summary>
+    /// Below the path box: the status line on the left and, against the right edge (in line with Browse), the label size:
+    /// "Labelformaat (mm): [100] × [100]". The label files do not contain the size of the label, so it is set here.
+    /// </summary>
+    private Control BuildStatusRow()
+    {
+        FileStatus.AutoSize = false;     // its size comes from FitFileTexts
+        FileStatus.AutoEllipsis = true;  // a long csv path ends in "…" instead of a second line
+        FileStatus.Anchor = AnchorStyles.Left; // in the middle of the row's height
+        FileStatus.Margin = new Padding(0, 0, 8, 0);
+        FileStatus.ForeColor = Theme.Navy;
+
+        LabelSizeCaption.AutoSize = true;
+        LabelSizeCaption.Anchor = AnchorStyles.Left;
+        LabelSizeCaption.Margin = new Padding(0, 0, 6, 0);
+        LabelSizeCaption.ForeColor = Theme.Navy;
+
+        var times = new Label { Text = Strings.LabelSizeTimes, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(4, 0, 4, 0), ForeColor = Theme.Navy };
+
+        // The size panel: AutoSize columns only (the frames have a fixed size).
+        LabelSizePanel.ColumnCount = 4;
+        LabelSizePanel.RowCount = 1;
+        LabelSizePanel.AutoSize = true;
+        LabelSizePanel.Anchor = AnchorStyles.Right;
+        LabelSizePanel.Margin = new Padding(0);
+        for (int i = 0; i < 4; i++)
+        {
+            LabelSizePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        }
+
+        LabelSizePanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        LabelSizePanel.Controls.Add(LabelSizeCaption, 0, 0);
+        LabelSizePanel.Controls.Add(LabelSizeFrame(LabelLengthBox), 1, 0);
+        LabelSizePanel.Controls.Add(times, 2, 0);
+        LabelSizePanel.Controls.Add(LabelSizeFrame(LabelWidthBox), 3, 0);
+
+        // Two cells, like the footer: the status line (fixed size, AutoSize column) and the size panel (the rest, anchored
+        // at the right edge). Not the other way round: a fixed-size control in a Percent column of an AutoSize table shrinks.
+        var statusRow = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 0) };
+        statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        statusRow.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        statusRow.Controls.Add(FileStatus, 0, 0);
+        statusRow.Controls.Add(LabelSizePanel, 1, 0);
+        return statusRow;
+    }
+
+    /// <summary>One field of the label size, in the same rounded frame as the path box, the number on the right.</summary>
+    private static TextBoxFrame LabelSizeFrame(TextBox box)
+    {
+        box.ForeColor = Theme.Navy;
+        box.TextAlign = HorizontalAlignment.Right;
+        return new TextBoxFrame(box) { Size = LabelSizeBoxSize, Margin = new Padding(0) };
+    }
+
+    /// <summary>
+    /// A field of the label size was changed: a valid number (1 – 1000 mm, dot or comma) is used at once and saved;
+    /// anything else turns red and the preview keeps the last valid size.
+    /// </summary>
+    private void OnLabelSizeChanged(TextBox box)
+    {
+        bool valid = LabelXml.TryNumber(box.Text, out double millimetres) && AppSettings.IsValidLabelSize(millimetres);
+        box.ForeColor = valid ? Theme.Navy : Theme.Error;
+        if (!valid)
+        {
+            return;
+        }
+
+        if (box == LabelLengthBox)
+        {
+            _settings.LabelLength = millimetres;
+        }
+        else
+        {
+            _settings.LabelWidth = millimetres;
+        }
+
+        Preview.LabelSize = new SizeF((float)_settings.LabelLength, (float)_settings.LabelWidth);
+        TrySaveSettings();
+    }
+
+    /// <summary>
+    /// Row 1: two lines, each a caption, a path box (Enter opens what was typed) and a Browse button:
+    ///   "Template of label-xml:"  the file in the editor;
+    ///   "Label-csv:"              the data for a template (not used, and greyed out, with a label-xml).
+    /// </summary>
+    private Control BuildFileRows()
+    {
+        // Captions, frames and buttons in AutoSize columns, only the frames stretch (anchored left and right in the Percent
+        // column), so the captions never wrap and the buttons are never shrunk.
+        var rows = new TableLayoutPanel { ColumnCount = 3, RowCount = 2, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        AddFileLine(rows, 0, XmlFileCaption, XmlFileBox, XmlBrowseButton, OpenTypedXmlFile, BrowseForXmlFile);
+        AddFileLine(rows, 1, CsvFileCaption, CsvFileBox, CsvBrowseButton, OpenTypedCsvFile, BrowseForCsvFile);
+        return rows;
+    }
+
+    /// <summary>One line of <see cref="BuildFileRows"/>; the second line has some room above it.</summary>
+    private static void AddFileLine(TableLayoutPanel rows, int row, Label caption, TextBox box, RoundedButton browse, Action openTyped, Action openBrowsed)
+    {
+        int top = row == 0 ? 0 : 6;
+
+        caption.AutoSize = true;
+        caption.Anchor = AnchorStyles.Left; // in the middle of the line's height
+        caption.Margin = new Padding(0, top, 8, 0);
+        caption.ForeColor = Theme.Navy;
+
+        // The text box sits in a rounded frame that is as high as the button, so both line up.
+        box.ForeColor = Theme.Navy;
+        var frame = new TextBoxFrame(box)
+        {
+            Height = ButtonSize.Height,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            Margin = new Padding(0, top, 8, 0),
+        };
+        box.KeyDown += (sender, e) =>
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true; // no "ding"
+                openTyped();
+            }
+        };
+
+        browse.Size = ButtonSize;
+        browse.Margin = new Padding(0, top, 0, 0);
+        Theme.StyleSecondaryButton(browse);
+        browse.Click += (sender, e) => openBrowsed();
+
+        rows.Controls.Add(caption, 0, row);
+        rows.Controls.Add(frame, 1, row);
+        rows.Controls.Add(browse, 2, row);
+    }
+
+    /// <summary>
+    /// Row 2: two columns of equal width with a thin vertical line between them. Left the text of the template, right
+    /// the preview of the label; above each a bold title. This table is not AutoSize (it fills the rest of the window),
+    /// so its controls may stretch.
+    /// </summary>
+    private Control BuildWorkspace()
+    {
+        PreviewCaption.Font = new Font(Font, FontStyle.Bold);
+        MakeOneLineTitle(PreviewCaption);
+
+        // The left column: the xml editor (XmlEditor.cs) and, for a label-csv, the csv table; one of the two is visible.
+        Editor.TextChanged += (sender, e) => OnEditorChanged();
+        BuildCsvGrid();
+        EditorArea.Dock = DockStyle.Fill;
+        EditorArea.Margin = new Padding(0);
+        EditorArea.Controls.Add(new ContentFrame(CsvGrid) { Dock = DockStyle.Fill, Visible = false });
+        EditorArea.Controls.Add(new ContentFrame(Editor) { Dock = DockStyle.Fill, FillColor = Theme.XmlBackground }); // no white ring around the grey editor
+
+        Preview.Dock = DockStyle.Fill;
+        Preview.Margin = new Padding(0);
+        Preview.BackColor = Theme.White;
+
+        ColumnDivider.Width = 1;
+        ColumnDivider.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom;
+        ColumnDivider.BackColor = Theme.PaleBlue;
+        ColumnDivider.Margin = new Padding(20, 0, 20, 0);
+
+        var workspace = new TableLayoutPanel { ColumnCount = 3, RowCount = 2, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        workspace.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        workspace.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        workspace.Controls.Add(BuildEditorHeader(), 0, 0);
+        workspace.Controls.Add(BuildPreviewHeader(), 2, 0);
+        workspace.Controls.Add(EditorArea, 0, 1);
+        workspace.Controls.Add(ColumnDivider, 1, 1);
+        workspace.Controls.Add(Preview, 2, 1);
+        return workspace;
+    }
+
+    /// <summary>
+    /// The title of the left column and, against its right edge, the two buttons "Template (xml)" / "Label-csv" that
+    /// choose what the column shows (only visible when a label-csv is open). Like the preview header, always as high as a
+    /// button, so nothing jumps when the buttons appear.
+    /// </summary>
+    private Control BuildEditorHeader()
+    {
+        EditorCaption.Font = new Font(Font, FontStyle.Bold);
+        MakeOneLineTitle(EditorCaption);
+
+        XmlViewButton.Size = ViewButtonSize;
+        XmlViewButton.Margin = new Padding(0, 0, 4, 0);
+        CsvViewButton.Size = ViewButtonSize;
+        CsvViewButton.Margin = new Padding(0);
+        XmlViewButton.Click += (sender, e) => ShowCsvView(false);
+        CsvViewButton.Click += (sender, e) => ShowCsvView(true);
+
+        EditorHeader.ColumnCount = 3;
+        EditorHeader.RowCount = 1;
+        EditorHeader.AutoSize = true;
+        EditorHeader.Dock = DockStyle.Fill;
+        EditorHeader.Margin = new Padding(0, 0, 0, 4);
+        EditorHeader.MinimumSize = new Size(0, ViewButtonSize.Height);
+        EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        EditorHeader.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        EditorHeader.Controls.Add(EditorCaption, 0, 0);
+        EditorHeader.Controls.Add(XmlViewButton, 1, 0);
+        EditorHeader.Controls.Add(CsvViewButton, 2, 0);
+        return EditorHeader;
+    }
+
+    /// <summary>
+    /// A column title next to buttons: always ONE line, as wide as its cell, ending in "…" when the text does not fit.
+    /// An AutoSize label in a table cell is wrapped by the table instead (seen with the long French csv title in 0.4.0,
+    /// and in TsDssConverter 1.1.0), and then the row grows and the columns below it move.
+    /// </summary>
+    private static void MakeOneLineTitle(Label title)
+    {
+        title.AutoSize = false;
+        title.AutoEllipsis = true;
+        title.TextAlign = ContentAlignment.MiddleLeft; // in line with the middle of the buttons next to it
+        title.Height = title.PreferredHeight; // one line of its (bold) font; scaled with the window like every size
+        title.Anchor = AnchorStyles.Left | AnchorStyles.Right; // the cell's width, in the middle of the row's height
+        title.Margin = new Padding(0);
+    }
+
+    /// <summary>
+    /// The csv table: read-only, one row per csv line (= one label), the first column the label number (as in "2 / 3").
+    /// Clicking a row shows that label in the preview; the arrows select the row of the label they show.
+    /// The standard table of Windows, in the colours of the theme.
+    /// </summary>
+    private void BuildCsvGrid()
+    {
+        CsvGrid.ReadOnly = true;
+        CsvGrid.AllowUserToAddRows = false;
+        CsvGrid.AllowUserToDeleteRows = false;
+        CsvGrid.AllowUserToResizeRows = false;
+        CsvGrid.AllowUserToOrderColumns = false;
+        CsvGrid.RowHeadersVisible = false;
+        CsvGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        CsvGrid.MultiSelect = false;
+        CsvGrid.BorderStyle = BorderStyle.None; // the rounded ContentFrame around it is the border
+        CsvGrid.BackgroundColor = Theme.White;
+        CsvGrid.GridColor = Theme.PaleBlue;
+        CsvGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
+        CsvGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+
+        // The headers in the colours of the theme (otherwise Windows draws them in its own grey).
+        CsvGrid.EnableHeadersVisualStyles = false;
+        CsvGrid.ColumnHeadersDefaultCellStyle.BackColor = Theme.VeryPaleBlue;
+        CsvGrid.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Navy;
+        CsvGrid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Theme.VeryPaleBlue;
+        CsvGrid.ColumnHeadersDefaultCellStyle.SelectionForeColor = Theme.Navy;
+        CsvGrid.ColumnHeadersDefaultCellStyle.Font = new Font(Font, FontStyle.Bold);
+        CsvGrid.DefaultCellStyle.BackColor = Theme.White;
+        CsvGrid.DefaultCellStyle.ForeColor = Theme.Navy;
+        CsvGrid.DefaultCellStyle.SelectionBackColor = Theme.PaleBlue;
+        CsvGrid.DefaultCellStyle.SelectionForeColor = Theme.Navy;
+
+        CsvGrid.CurrentCellChanged += (sender, e) => OnCsvRowChosen(); // after the current row has changed (SelectionChanged comes too early)
+    }
+
+    /// <summary>Fills the csv table with the label-csv (or empties it). The columns keep the order of the file.</summary>
+    private void FillCsvGrid(LabelCsv? csv)
+    {
+        _selectingCsvRow = true; // filling selects the first row: that is not a choice of the user
+        CsvGrid.Rows.Clear();
+        CsvGrid.Columns.Clear();
+
+        if (csv != null)
+        {
+            CsvGrid.Columns.Add("number", Strings.CsvNumberColumn);
+            foreach (string column in csv.Columns)
+            {
+                CsvGrid.Columns.Add("", column);
+            }
+
+            foreach (DataGridViewColumn column in CsvGrid.Columns)
+            {
+                column.SortMode = DataGridViewColumnSortMode.NotSortable; // row n stays label n
+            }
+
+            for (int row = 0; row < csv.Rows.Count; row++)
+            {
+                var cells = new List<object> { row + 1 };
+                cells.AddRange(csv.Columns.Select(column => (object)(csv.Rows[row].TryGetValue(column, out string? value) ? value : "")));
+                CsvGrid.Rows.Add(cells.ToArray());
+            }
+        }
+
+        _selectingCsvRow = false;
+    }
+
+    /// <summary>Shows the template text (false) or the csv table (true) in the left column.</summary>
+    internal void ShowCsvView(bool csv)
+    {
+        _showingCsv = csv && _csv != null;
+        Editor.Parent!.Visible = !_showingCsv;
+        CsvGrid.Parent!.Visible = _showingCsv;
+        Theme.StyleToggleButton(XmlViewButton, selected: !_showingCsv);
+        Theme.StyleToggleButton(CsvViewButton, selected: _showingCsv);
+        EditorCaption.Text = _showingCsv ? Strings.CsvCaption : Strings.EditorCaption;
+        if (_showingCsv)
+        {
+            SelectCsvRowOfShownLabel(); // the row of the label in the preview
+        }
+    }
+
+    /// <summary>The user clicked a row of the csv table: show the (first) label of that csv line.</summary>
+    private void OnCsvRowChosen()
+    {
+        if (_selectingCsvRow || CsvGrid.CurrentRow == null || Preview.Labels == null)
+        {
+            return;
+        }
+
+        int row = CsvGrid.CurrentRow.Index;
+        int label = Preview.Labels.Labels.FindIndex(item => item.CsvRow == row);
+        if (label >= 0 && label != Preview.Index)
+        {
+            ShowLabel(label);
+        }
+    }
+
+    /// <summary>Selects the csv row of the label in the preview (after the arrows, typing, or opening the table).</summary>
+    private void SelectCsvRowOfShownLabel()
+    {
+        if (Preview.Count == 0 || Preview.Labels!.Labels[Preview.Index].CsvRow is not int row || row >= CsvGrid.Rows.Count)
+        {
+            return;
+        }
+
+        // Already the current row: the user just clicked it. Setting it again from inside the table's own event is not
+        // allowed by the DataGridView ("reentrant call").
+        if (CsvGrid.CurrentRow?.Index == row)
+        {
+            return;
+        }
+
+        _selectingCsvRow = true;
+        CsvGrid.CurrentCell = CsvGrid.Rows[row].Cells[0]; // also scrolls the row into view
+        _selectingCsvRow = false;
+    }
+
+    /// <summary>
+    /// The title of the preview and, against the right edge of the preview, "2 / 3" and the two arrows (only visible
+    /// when there is more than one label: a label-xml of a whole sheet, or a template with a csv of several lines).
+    /// The header is always as high as an arrow, also without arrows, so the editor and the preview never jump.
+    /// </summary>
+    private Control BuildPreviewHeader()
+    {
+        LabelCounter.AutoSize = true;
+        LabelCounter.Anchor = AnchorStyles.Left;
+        LabelCounter.Margin = new Padding(0, 0, 8, 0);
+        LabelCounter.ForeColor = Theme.Navy;
+
+        foreach (RoundedButton arrow in new[] { PreviousButton, NextButton })
+        {
+            arrow.Size = ArrowButtonSize;
+            arrow.Margin = new Padding(0);
+            Theme.StyleSecondaryButton(arrow);
+        }
+
+        PreviousButton.Text = Strings.PreviousArrow;
+        NextButton.Text = Strings.NextArrow;
+        PreviousButton.Margin = new Padding(0, 0, 4, 0);
+        PreviousButton.Click += (sender, e) => ShowLabel(Preview.Index - 1);
+        NextButton.Click += (sender, e) => ShowLabel(Preview.Index + 1);
+
+        // The title takes the free width; the counter and the arrows only what they need (AutoSize columns: the arrows
+        // have a fixed size, and a fixed-size control in a Percent column of an AutoSize table is shrunk).
+        PreviewHeader.ColumnCount = 4;
+        PreviewHeader.RowCount = 1;
+        PreviewHeader.AutoSize = true;
+        PreviewHeader.Dock = DockStyle.Fill;
+        PreviewHeader.Margin = new Padding(0, 0, 0, 4);
+        PreviewHeader.MinimumSize = new Size(0, ArrowButtonSize.Height);
+        PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        PreviewHeader.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        PreviewHeader.Controls.Add(PreviewCaption, 0, 0);
+        PreviewHeader.Controls.Add(LabelCounter, 1, 0);
+        PreviewHeader.Controls.Add(PreviousButton, 2, 0);
+        PreviewHeader.Controls.Add(NextButton, 3, 0);
+        return PreviewHeader;
+    }
+
+    /// <summary>The bottom line of the window: the company logo at the left, Save and Close at the right.</summary>
+    private Control BuildBottomRow()
+    {
+        LogoPicture.Image = AppIcons.CompanyLogo();
+        LogoPicture.SizeMode = PictureBoxSizeMode.Zoom; // keeps the proportions of the logo
+        LogoPicture.Size = LogoSize;
+        LogoPicture.BackColor = Theme.White;
+        LogoPicture.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
+        LogoPicture.Margin = new Padding(0);
+        LogoPicture.Cursor = Cursors.Hand;
+        _toolTip.SetToolTip(LogoPicture, Strings.CompanyName);
+        LogoPicture.Click += (sender, e) => OpenWebsite(Strings.CompanyUrl);
+
+        // Same size and same margins for both, so they sit in one line.
+        SaveButton.Size = ButtonSize;
+        SaveButton.Margin = new Padding(8, 0, 0, 0);
+        CloseButton.Size = ButtonSize;
+        CloseButton.Margin = new Padding(8, 0, 0, 0);
+        Theme.StylePrimaryButton(SaveButton);
+        Theme.StyleSecondaryButton(CloseButton);
+        SaveButton.Click += (sender, e) => SaveFile();
+        CloseButton.Click += (sender, e) => Close();
+        // No AcceptButton: Enter in the path box opens the file, Enter in the editor starts a new line.
+
+        var buttons = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
+            AutoSize = true,
+            Anchor = AnchorStyles.Right | AnchorStyles.Bottom,
+            Margin = new Padding(0),
+        };
+        buttons.Controls.Add(CloseButton); // right to left: Close is the right-most button
+        buttons.Controls.Add(SaveButton);
+
+        // The logo only what it needs, the buttons the rest (a Percent column would shrink the logo).
+        var bottom = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 20, 0, 0) };
+        bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        bottom.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        bottom.Controls.Add(LogoPicture, 0, 0);
+        bottom.Controls.Add(buttons, 1, 0);
+        return bottom;
+    }
+
+    /// <summary>A thin horizontal line over the full width, in the pale blue of the theme.</summary>
+    private void AddDivider(TableLayoutPanel table, ref int row, Padding margin)
+    {
+        var line = new Panel { Height = 1, Dock = DockStyle.Fill, BackColor = Theme.PaleBlue, Margin = margin };
+        Dividers.Add(line);
+        AddRow(table, ref row, line);
+    }
+
+    private static void AddRow(TableLayoutPanel table, ref int row, Control control)
+    {
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        table.Controls.Add(control, 0, row);
+        row++;
+    }
+
+    // ------------------------------------------------------------------ language
+
+    /// <summary>Puts every text in the selected language. Called at the start and after a language change.</summary>
+    internal void ApplyTexts()
+    {
+        UpdateTitle();
+        VersionLabel.Text = Strings.AppVersion(AppInfo.Version);
+        _toolTip.SetToolTip(UserGuidePicture, Strings.UserGuideTooltip);
+        FileCaption.Text = Strings.FileCaption;
+        FileDescription.Text = Strings.FileDescription;
+        XmlFileCaption.Text = Strings.XmlFileCaption;
+        CsvFileCaption.Text = Strings.CsvFileCaption;
+        XmlBrowseButton.Text = Strings.Browse;
+        CsvBrowseButton.Text = Strings.Browse;
+        EditorCaption.Text = _showingCsv ? Strings.CsvCaption : Strings.EditorCaption;
+        XmlViewButton.Text = Strings.XmlViewButton;
+        CsvViewButton.Text = Strings.CsvViewButton;
+        PreviewCaption.Text = Strings.PreviewCaption;
+        LabelSizeCaption.Text = Strings.LabelSizeCaption;
+        _toolTip.SetToolTip(LabelLengthBox, Strings.LabelLengthTooltip);
+        _toolTip.SetToolTip(LabelWidthBox, Strings.LabelWidthTooltip);
+        _toolTip.SetToolTip(PreviousButton, Strings.PreviousLabel);
+        _toolTip.SetToolTip(NextButton, Strings.NextLabel);
+        SaveButton.Text = Strings.Save;
+        CloseButton.Text = Strings.Close;
+        FitFileTexts(); // the description has another length in another language
+        RefreshPreview(newFile: false); // the preview's messages and the status line are in the language too
+    }
+
+    private void ChangeLanguage()
+    {
+        AppLanguage language = ((LanguageItem)LanguageBox.SelectedItem!).Language;
+        Localizer.Current = language;
+        _settings.Language = Localizer.ToCode(language);
+        ApplyTexts();
+        TrySaveSettings();
+    }
+
+    // ------------------------------------------------------------------ opening and saving
+
+    /// <summary>
+    /// Opens a label-xml or a template in the editor together with a label-csv (null = none; ignored for a label-xml).
+    /// Used at the start (the files of the last time) and by the tests. No questions asked: the caller chose the files.
+    /// Returns false (and says why, unless quiet) if a file cannot be read; then nothing changes.
+    /// </summary>
+    internal bool OpenLabelFiles(string xmlPath, string? csvPath, bool quiet = false)
+    {
+        LabelCsv? csv = null;
+        if (!TryRead(() => TextFile.Read(xmlPath), quiet, out TextFileContent? content) ||
+            (csvPath != null && !TryRead(() => LabelCsv.Read(csvPath), quiet, out csv)))
+        {
+            return false;
+        }
+
+        ShowXmlFile(xmlPath, content!);
+        UseCsv(IsLabelXml(content!.Text) ? null : csv);
+        RefreshPreview(newFile: true);
+        ShowCsvView(false); // a newly opened pair starts with the template text
+        RememberFiles();
+        return true;
+    }
+
+    /// <summary>
+    /// The upper line: opens a template or label-xml in the editor. A template keeps the label-csv that is open (another
+    /// template for the same data); a label-xml has its own data, so the csv is closed. Returns false if nothing was opened.
+    /// </summary>
+    internal bool OpenXmlFile(string path, bool quiet = false)
+    {
+        if (!TryRead(() => TextFile.Read(path), quiet, out TextFileContent? content))
+        {
+            return false;
+        }
+
+        ShowXmlFile(path, content!);
+        if (IsLabelXml(content!.Text))
+        {
+            UseCsv(null);
+        }
+
+        RefreshPreview(newFile: true);
+        ShowCsvView(_showingCsv);
+        RememberFiles();
+        return true;
+    }
+
+    /// <summary>
+    /// The lower line: opens a label-csv with the data for the template in the editor (also before the template is chosen),
+    /// or closes it (null). The text in the editor stays as it is. Returns false if the file cannot be read.
+    /// </summary>
+    internal bool OpenCsvFile(string? path, bool quiet = false)
+    {
+        LabelCsv? csv = null;
+        if (path != null && !TryRead(() => LabelCsv.Read(path), quiet, out csv))
+        {
+            return false;
+        }
+
+        UseCsv(csv);
+        RefreshPreview(newFile: true); // the first label of the new data
+        ShowCsvView(_showingCsv);
+        RememberFiles();
+        return true;
+    }
+
+    /// <summary>Reads a file; when that fails, says why (unless quiet) and returns false.</summary>
+    private bool TryRead<T>(Func<T> read, bool quiet, out T? result)
+    {
+        try
+        {
+            result = read();
+            return true;
+        }
+        catch (Exception error) when (error is IOException || error is UnauthorizedAccessException || error is ArgumentException || error is NotSupportedException)
+        {
+            if (!quiet)
+            {
+                MessageBox.Show(this, Strings.CannotReadFile(error.Message), Strings.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+
+            result = default;
+            return false;
+        }
+    }
+
+    /// <summary>Puts a file that was read into the editor (not a change by the user: "undo" cannot go back past it).</summary>
+    private void ShowXmlFile(string path, TextFileContent content)
+    {
+        _loading = true;
+        Editor.LoadText(content.Text);
+        _loading = false;
+
+        _currentFile = Path.GetFullPath(path);
+        _loaded = content;
+        _modified = false;
+        XmlFileBox.Text = _currentFile;
+        UpdateTitle();
+        Preview.ForgetImages(); // the pictures of the labels may be other files now
+    }
+
+    /// <summary>The label-csv that goes with the template (null = none): its path box and its table.</summary>
+    private void UseCsv(LabelCsv? csv)
+    {
+        _csv = csv;
+        CsvFileBox.Text = csv?.FilePath ?? "";
+        FillCsvGrid(csv);
+    }
+
+    /// <summary>Remembers the open files, to open them again at the next start.</summary>
+    private void RememberFiles()
+    {
+        if (_currentFile != null) // no template open (it could not be opened at the start): keep the last one for next time
+        {
+            _settings.LastFile = _currentFile;
+        }
+
+        _settings.LastCsvFile = _csv?.FilePath ?? "";
+        TrySaveSettings();
+    }
+
+    /// <summary>A valid label-xml (not a template, not broken xml): it holds its own data, a label-csv is not used.</summary>
+    private static bool IsLabelXml(string xmlText)
+    {
+        LabelSet labels = LabelSetBuilder.Build(xmlText, null, DateTime.Now);
+        return labels.Error == null && labels.Kind == LabelFileKind.LabelXml;
+    }
+
+    /// <summary>A file given on the command line (or dropped on the exe): a .csv goes to the lower line, anything else to the upper.</summary>
+    private bool OpenChosenFile(string path)
+    {
+        return Path.GetExtension(path).Equals(".csv", StringComparison.OrdinalIgnoreCase)
+            ? OpenCsvFile(path)
+            : ConfirmLeavingChanges() && OpenXmlFile(path);
+    }
+
+    /// <summary>
+    /// Saves the editor to the open file, in the same encoding and line endings as it was read. With no file open yet
+    /// it asks for a name first. Returns false if nothing was saved.
+    /// </summary>
+    internal bool SaveFile()
+    {
+        string? path = _currentFile;
+        if (path == null)
+        {
+            using var dialog = new SaveFileDialog { Filter = Strings.XmlFileFilter };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return false;
+            }
+
+            path = dialog.FileName;
+        }
+
+        // A new file: UTF-8 without BOM and Windows line endings.
+        TextFileContent how = _loaded ?? new TextFileContent("", new System.Text.UTF8Encoding(false), LineEnding.CrLf);
+        try
+        {
+            TextFile.Write(path, Editor.Text, how.Encoding, how.LineEnding);
+        }
+        catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, Strings.CannotSaveFile(error.Message), Strings.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return false;
+        }
+
+        _currentFile = Path.GetFullPath(path);
+        _loaded = how;
+        _modified = false;
+        XmlFileBox.Text = _currentFile;
+        UpdateTitle();
+        RefreshPreview(newFile: false); // pictures with a relative path: the folder may have changed
+        RememberFiles();
+        return true;
+    }
+
+    /// <summary>The upper Browse button (and Ctrl+O): a template or a label-xml.</summary>
+    private void BrowseForXmlFile()
+    {
+        string? path = AskForFile(Strings.XmlFileFilter, _currentFile, AppDataFolder.LabelsFolderName);
+        if (path != null && ConfirmLeavingChanges())
+        {
+            OpenXmlFile(path);
+        }
+    }
+
+    /// <summary>The lower Browse button: a label-csv.</summary>
+    private void BrowseForCsvFile()
+    {
+        string? path = AskForFile(Strings.CsvFilter, _csv?.FilePath, AppDataFolder.CsvFolderName);
+        if (path != null)
+        {
+            OpenCsvFile(path);
+        }
+    }
+
+    /// <summary>
+    /// A file dialog that starts in the folder of the open file of that line, or else in the example folder of
+    /// C:\DssLabelTemplate (labels, CSV examples). Null = Cancel.
+    /// </summary>
+    private string? AskForFile(string filter, string? openFile, string exampleFolderName)
+    {
+        using var dialog = new OpenFileDialog { Filter = filter };
+        string? exampleFolder = _dataFolder == null ? null : Path.Combine(_dataFolder, exampleFolderName);
+        if (openFile != null)
+        {
+            dialog.InitialDirectory = Path.GetDirectoryName(openFile);
+        }
+        else if (exampleFolder != null && Directory.Exists(exampleFolder))
+        {
+            dialog.InitialDirectory = exampleFolder;
+        }
+
+        return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
+    }
+
+    /// <summary>Enter in the upper path box: open what was typed (the box goes back to the open file if that fails).</summary>
+    private void OpenTypedXmlFile()
+    {
+        string typed = TypedPath(XmlFileBox);
+        if (typed == "" || !ConfirmLeavingChanges() || !OpenXmlFile(typed))
+        {
+            XmlFileBox.Text = _currentFile ?? "";
+        }
+    }
+
+    /// <summary>Enter in the lower path box: open what was typed; an empty box closes the label-csv.</summary>
+    private void OpenTypedCsvFile()
+    {
+        string typed = TypedPath(CsvFileBox);
+        if (!OpenCsvFile(typed == "" ? null : typed))
+        {
+            CsvFileBox.Text = _csv?.FilePath ?? "";
+        }
+    }
+
+    /// <summary>The path in a box, without the quotes that Explorer's "Copy as path" puts around it.</summary>
+    private static string TypedPath(TextBox box) => box.Text.Trim().Trim('"');
+
+    /// <summary>
+    /// Before the text in the editor is replaced or the program closes: if there are unsaved changes, ask whether to
+    /// save them. Returns false when the user chose Cancel (or the save failed): then nothing must happen.
+    /// </summary>
+    private bool ConfirmLeavingChanges()
+    {
+        if (!_modified)
+        {
+            return true;
+        }
+
+        string name = _currentFile == null ? Strings.Untitled : Path.GetFileName(_currentFile);
+        DialogResult answer = MessageBox.Show(this, Strings.SaveChangesQuestion(name), Strings.AppName,
+            MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+
+        return answer switch
+        {
+            DialogResult.Yes => SaveFile(),
+            DialogResult.No => true,
+            _ => false,
+        };
+    }
+
+    private void OnEditorChanged()
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        if (!_modified)
+        {
+            _modified = true;
+            UpdateTitle();
+        }
+
+        // Restart the timer: the preview follows when the user stops typing for a moment.
+        _previewTimer.Stop();
+        _previewTimer.Start();
+    }
+
+    /// <summary>
+    /// Reads the text in the editor again (with the label-csv of a template) and shows it: the preview, the arrows and the
+    /// status line. Called after opening a file (the first label), 300 ms after typing (the same label stays), and after a
+    /// language change.
+    /// </summary>
+    private void RefreshPreview(bool newFile)
+    {
+        _previewTimer.Stop();
+        LabelSet? labels = Editor.Text.Trim() == "" ? null : LabelSetBuilder.Build(Editor.Text, _csv, DateTime.Now);
+        string? folder = _currentFile == null ? null : Path.GetDirectoryName(_currentFile);
+        Preview.ShowLabels(labels, folder, keepIndex: !newFile);
+        Editor.MarkVariables();
+        _isLabelXml = labels is { Error: null, Kind: LabelFileKind.LabelXml };
+        UpdateCsvLine();
+        UpdateNavigation();
+        UpdateFileStatus(labels);
+    }
+
+    /// <summary>
+    /// The label-csv line is greyed out while the editor holds a label-xml (it has its own data, the csv is not used);
+    /// the grey text in the empty box says so. With a template, or nothing open yet, a csv can be chosen.
+    /// </summary>
+    private void UpdateCsvLine()
+    {
+        bool usable = !_isLabelXml;
+        CsvFileCaption.Enabled = usable;
+        CsvFileBox.Enabled = usable;
+        CsvBrowseButton.Enabled = usable;
+        CsvFileBox.PlaceholderText = usable ? Strings.CsvPlaceholder : Strings.CsvNotNeededPlaceholder;
+    }
+
+    /// <summary>Shows another label (the arrows); the index is kept within the labels by the preview.</summary>
+    internal void ShowLabel(int index)
+    {
+        Preview.Index = index;
+        UpdateNavigation();
+    }
+
+    /// <summary>The counter and the arrows: only when there is more than one label; an arrow at the end cannot be pressed.</summary>
+    private void UpdateNavigation()
+    {
+        int count = Preview.Count;
+        bool several = count > 1;
+        LabelCounter.Visible = several;
+        PreviousButton.Visible = several;
+        NextButton.Visible = several;
+
+        // "2 / 3" is the same in every language (numbers only).
+        LabelCounter.Text = (Preview.Index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + " / " +
+                            count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        PreviousButton.Enabled = Preview.Index > 0;
+        NextButton.Enabled = Preview.Index < count - 1;
+
+        // The two view buttons only with a label-csv that is used; the csv table follows the label of the preview.
+        bool csv = _csv != null && !_isLabelXml;
+        XmlViewButton.Visible = csv;
+        CsvViewButton.Visible = csv;
+        if (!csv && _showingCsv)
+        {
+            ShowCsvView(false);
+        }
+
+        SelectCsvRowOfShownLabel();
+    }
+
+    /// <summary>The line below the path boxes: what kind of file is open, with how many labels.</summary>
+    private void UpdateFileStatus(LabelSet? labels)
+    {
+        FileStatus.Text = labels switch
+        {
+            null when _csv != null => Strings.StatusCsvWithoutTemplate,
+            null => Strings.StatusNothingOpen,
+            { Error: not null } => Strings.StatusXmlError,
+            { Kind: LabelFileKind.LabelXml } => Strings.StatusLabelXml(labels.Labels.Count),
+            _ when _csv != null => Strings.StatusTemplateWithCsv(labels.Labels.Count),
+            _ => Strings.StatusTemplateWithoutCsv,
+        };
+    }
+
+    /// <summary>The title bar: the program name, the open file, and a * when there are unsaved changes (like Notepad).</summary>
+    private void UpdateTitle()
+    {
+        string title = Strings.AppName;
+        if (_currentFile != null || _modified)
+        {
+            string name = _currentFile == null ? Strings.Untitled : Path.GetFileName(_currentFile);
+            title += " - " + name + (_modified ? " *" : "");
+        }
+
+        Text = title;
+    }
+
+    private void TrySaveSettings()
+    {
+        try
+        {
+            _saveSettings(_settings);
+        }
+        catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, Strings.SettingsSaveFailed(error.Message), Strings.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private void OpenWebsite(string url)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception || error is IOException)
+        {
+            MessageBox.Show(this, Strings.CannotOpenLink(error.Message), Strings.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    // ------------------------------------------------------------------ window events
+
+    /// <summary>Ctrl+S saves, Ctrl+O opens (as in Notepad).</summary>
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (keyData == (Keys.Control | Keys.S))
+        {
+            SaveFile();
+            return true;
+        }
+
+        if (keyData == (Keys.Control | Keys.O))
+        {
+            BrowseForXmlFile();
+            return true;
+        }
+
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    /// <summary>
+    /// Makes sure the window is not bigger than the part of the screen that is free (not under the taskbar)
+    /// and puts it in the middle of it.
+    /// </summary>
+    internal void FitToArea(Rectangle area)
+    {
+        int width = Math.Min(Width, area.Width);
+        int height = Math.Min(Height, area.Height);
+        Size = new Size(width, height);
+        Location = new Point(area.Left + (area.Width - width) / 2, area.Top + (area.Height - height) / 2);
+    }
+
+    protected override void OnLoad(EventArgs e)
+    {
+        base.OnLoad(e); // the scaling of the whole window has been applied by now
+        FitToArea(Screen.FromControl(this).WorkingArea);
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+
+        // A file given at the start; otherwise the last files, quietly (they may have been moved or deleted since).
+        // A label-csv that is gone: the template is opened without data; a template that is gone: only the csv.
+        if (_fileToOpen != null)
+        {
+            OpenChosenFile(_fileToOpen);
+            return;
+        }
+
+        string? csv = _settings.LastCsvFile != "" && File.Exists(_settings.LastCsvFile) ? _settings.LastCsvFile : null;
+        if (_settings.LastFile == "" || !OpenLabelFiles(_settings.LastFile, csv, quiet: true))
+        {
+            if (csv != null)
+            {
+                OpenCsvFile(csv, quiet: true);
+            }
+        }
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (e.CloseReason == CloseReason.UserClosing && !ConfirmLeavingChanges())
+        {
+            e.Cancel = true;
+        }
+
+        base.OnFormClosing(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _previewTimer.Dispose();
+            _toolTip.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+}

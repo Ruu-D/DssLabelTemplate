@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <AssemblyName>DssLabelTemplate</AssemblyName>
+    <RootNamespace>DssLabelTemplate</RootNamespace>
+
+    <!-- The version shown at the top right of the window. Change it here (the only place). -->
+    <Version>1.0.0</Version>
+
+    <!-- Sharp on high-DPI screens and on a second monitor with another scaling -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+
+    <!-- The icon of the exe itself (Explorer, taskbar) -->
+    <ApplicationIcon>..\..\media\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- The graphics from the media folder are built into the exe: it stays one single file. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\media\app.ico" LogicalName="app.ico" />
+    <EmbeddedResource Include="..\..\media\ROGIERS-transp-small.png" LogicalName="rogiers-logo.png" />
+    <EmbeddedResource Include="..\..\media\user-guide.png" LogicalName="user-guide.png" />
+  </ItemGroup>
+
+  <!-- The example label files, written to C:\DssLabelTemplate\labels and \CSV examples at the first start (AppDataFolder.cs).
+       To change what a new installation gets: change the files in samples\pdf-manual (the tests use the same files). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\samples\pdf-manual\*.xml" LogicalName="examples/labels/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\samples\pdf-manual\*.csv" LogicalName="examples/csv/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- Lets the tests reach the internal classes of this project -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="DssLabelTemplate.Tests" />
+  </ItemGroup>
+
+  <!--
+    The XML editor: Scintilla (the editor of Notepad++), MIT licence, approved by Daan on 2026-10-24.
+    The package brings two native Windows files (Scintilla.dll, Lexilla.dll). They cannot run from inside a single-file
+    exe, so the 64-bit pair is built INTO the exe and written to %LOCALAPPDATA%\DssLabelTemplate\scintilla\ at start
+    (ScintillaFiles.cs). GeneratePathProperty gives $(PkgScintilla5_NET) = the folder of the package.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Scintilla5.NET" Version="7.1.1" GeneratePathProperty="true" />
+    <EmbeddedResource Include="$(PkgScintilla5_NET)\runtimes\win-x64\native\Scintilla.dll" LogicalName="native/Scintilla.dll" />
+    <EmbeddedResource Include="$(PkgScintilla5_NET)\runtimes\win-x64\native\Lexilla.dll" LogicalName="native/Lexilla.dll" />
+  </ItemGroup>
+
+  <!-- The package also copies its native files as loose files (runtimes\..., and for a win-x64 publish straight next to
+       the exe): the delivery must stay ONE exe, so they are left out of the publish folder (they are inside the exe, see
+       above). In a normal build they stay, for the tests. -->
+  <Target Name="LeaveScintillaFilesOutOfThePublishFolder" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').StartsWith('runtimes'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)%(Extension)' == 'Scintilla.dll' Or '%(Filename)%(Extension)' == 'Lexilla.dll'" />
+    </ItemGroup>
+  </Target>
+
+</Project>
