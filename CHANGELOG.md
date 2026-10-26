@@ -2,11 +2,17 @@
 
 ## 1.1.2 rebuild — 2026-10-26 (same version number, Daan)
 
-- **Delivery:** `dist\v1.1.2\DssLabelTemplate.exe`, 53,209,204 bytes, file version 1.1.2.0, SHA-256
-  `7c3f1718290ae538c70c007a573e876e3c5dea5e118d3bf5293a4200bf36510d`. Built by `publish.cmd` after all 181 tests passed;
-  the exe itself was not started. Rebuilt under the SAME number on Daan's request, so two different exes say 1.1.2: tell
+- **Delivery:** `dist\v1.1.2\DssLabelTemplate.exe`, 53,210,028 bytes, file version 1.1.2.0, SHA-256
+  `41d6038814d5ef9b7074f2b38441c93ae33659ee264a17f089f1e424df747a8a`. Built by `publish.cmd` after all 183 tests passed;
+  the exe itself was not started. Rebuilt under the SAME number on Daan's request, so different exes say 1.1.2: tell
   them apart by this checksum. The first 1.1.2 build (`4ea7e7fb...`) was copied to `dist\_previous-builds\2026-10-26\v1.1.2\`
-  first (publish.cmd empties `dist\v1.1.2`).
+  first (publish.cmd empties `dist\v1.1.2`). An intermediate rebuild of the same evening (`7c3f1718...`, without the
+  README) was replaced.
+- **README.md in the program folder (Daan):** his `C:\DssLabelTemplate\README.MD` (the hidden settings of settings.json:
+  `PrinterName`, `SheetRotationInViewer`, `SheetReferenceCorner`) is packed into the exe (`program-folder\README.md` in
+  the repository) and written next to settings.json at the start when no README is there; an existing one (any case of
+  the name) is never touched. Packed as a CLEANED copy: the original was saved with escaped Markdown (`\#`, `\*\*`, `\-`)
+  and an empty line after every line; the text itself is unchanged.
 
 - **Zero-point dot on the sheet map:** a round navy dot with a thin white ring on the corner the label X / Y are measured
   from, the same look as TsDssConverter's corner schematic. Drawn last (a label in that corner does not hide it); it turns
@@ -19,8 +25,8 @@
   mirrored for any corner other than Linksonder. The map converts every position back (`LabelPreview.ToBottomLeft`) and
   puts the dot on that corner. Rendered at a real 150% with a csv converted to Rechtsboven: the same map as Linksonder
   with the original csv, only the dot moved.
-- 181 tests (was 165): every corner gives the same spot for the sample part (X 399 / Y 540 from the bottom left), the dot's
-  corner, the setting saved / loaded / understood / repaired.
+- 183 tests (was 165): every corner gives the same spot for the sample part (X 399 / Y 540 from the bottom left), the dot's
+  corner, the setting saved / loaded / understood / repaired; the README written byte for byte, an existing one untouched.
 
 ## 1.1.2 — 2026-10-26 (after Daan's test of 1.1.1)
 

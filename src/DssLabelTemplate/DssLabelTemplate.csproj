@@ -36,6 +36,12 @@
     <EmbeddedResource Include="..\..\samples\pdf-manual\*.csv" LogicalName="examples/csv/%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- The README of the program folder (the hidden settings of settings.json, Daan 2026-10-26), written to
+       C:\DssLabelTemplate\README.md when it is not there (AppDataFolder.cs). To change it: change program-folder\README.md. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\program-folder\README.md" LogicalName="program-folder/README.md" />
+  </ItemGroup>
+
   <!-- Lets the tests reach the internal classes of this project -->
   <ItemGroup>
     <InternalsVisibleTo Include="DssLabelTemplate.Tests" />

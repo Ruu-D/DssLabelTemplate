@@ -50,6 +50,30 @@ public class AppDataFolderTests
     }
 
     [Fact]
+    public void TheFirstStart_WritesTheReadme_ByteForByte()
+    {
+        using var folder = new TempFolder();
+        string root = folder.File("DssLabelTemplate"); // does not exist yet
+
+        AppDataFolder.EnsureCreated(root);
+
+        string inRepository = Path.Combine(Samples.RepositoryFolder, "program-folder", "README.md");
+        Assert.Equal(File.ReadAllBytes(inRepository), File.ReadAllBytes(Path.Combine(root, "README.md")));
+    }
+
+    [Fact]
+    public void AnExistingReadme_IsNeverTouched_WhateverTheCaseOfItsName()
+    {
+        using var folder = new TempFolder();
+        File.WriteAllText(folder.File("README.MD"), "written by the user");
+
+        AppDataFolder.EnsureCreated(folder.Path);
+
+        Assert.Equal("written by the user", File.ReadAllText(folder.File("README.MD")));
+        Assert.Single(Directory.GetFiles(folder.Path, "readme.*")); // no second README next to it
+    }
+
+    [Fact]
     public void TheSettings_LiveInTheFolderItself()
     {
         Assert.Equal(@"C:\DssLabelTemplate", AppDataFolder.DefaultRoot);

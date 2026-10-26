@@ -7,7 +7,8 @@ namespace DssLabelTemplate;
 /// program). It holds settings.json and two folders with example files that come with the exe:
 ///   labels\         the label-xml and template examples (samples\pdf-manual\*.xml in the repository);
 ///   CSV examples\   the label-csv examples (samples\pdf-manual\*.csv).
-/// The examples are built INTO the exe (see the csproj), so the delivery stays one file.
+/// and README.md (the settings that are only in settings.json; program-folder\README.md in the repository).
+/// The examples and the README are built INTO the exe (see the csproj), so the delivery stays one file.
 /// </summary>
 internal static class AppDataFolder
 {
@@ -20,7 +21,11 @@ internal static class AppDataFolder
     private const string LabelsResourcePrefix = "examples/labels/";
     private const string CsvResourcePrefix = "examples/csv/";
 
+    // The name the csproj gives the packed README (program-folder\README.md in the repository).
+    internal const string ReadmeResourceName = "program-folder/README.md";
+
     public static string SettingsFile(string root) => Path.Combine(root, "settings.json");
+    public static string ReadmeFile(string root) => Path.Combine(root, "README.md");
     public static string LabelsFolder(string root) => Path.Combine(root, LabelsFolderName);
     public static string CsvFolder(string root) => Path.Combine(root, CsvFolderName);
 
@@ -34,6 +39,24 @@ internal static class AppDataFolder
         Directory.CreateDirectory(root);
         WriteExamples(LabelsFolder(root), LabelsResourcePrefix);
         WriteExamples(CsvFolder(root), CsvResourcePrefix);
+        WriteReadme(root);
+    }
+
+    /// <summary>
+    /// README.md next to settings.json (it explains the settings that are only in that file), written when it is not
+    /// there. An existing one is never touched (any case of the name: Windows does not see README.MD as another file).
+    /// </summary>
+    private static void WriteReadme(string root)
+    {
+        string path = ReadmeFile(root);
+        if (File.Exists(path))
+        {
+            return;
+        }
+
+        using Stream packed = Assembly.GetExecutingAssembly().GetManifestResourceStream(ReadmeResourceName)!;
+        using FileStream file = File.Create(path);
+        packed.CopyTo(file); // byte for byte
     }
 
     /// <summary>The file names of the examples that go into a folder (for the tests).</summary>
