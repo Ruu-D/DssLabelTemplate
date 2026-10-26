@@ -175,12 +175,53 @@ public class MainFormTests
             Assert.Equal(Top(form.NextButton), Top(form.PrintButton));
             Assert.True(form.PrintButton.PointToScreen(Point.Empty).X > RightEdge(form.NextButton), "print is right of the arrow");
 
-            int previewMiddle = form.Preview.PointToScreen(Point.Empty).X + form.Preview.Width / 2;
-            int buttonsMiddle = form.PreviewNavigation.PointToScreen(Point.Empty).X + form.PreviewNavigation.Width / 2;
-            Assert.InRange(Math.Abs(previewMiddle - buttonsMiddle), 0, 1);
+            // The counter against the preview's left edge, print against its right edge, the arrows in the middle.
+            int previewLeft = form.Preview.PointToScreen(Point.Empty).X;
+            Assert.Equal(previewLeft, form.LabelCounter.PointToScreen(Point.Empty).X);
+            Assert.Equal(RightEdge(form.Preview), RightEdge(form.PrintButton));
+            int previewMiddle = previewLeft + form.Preview.Width / 2;
+            int arrowsMiddle = (form.PreviousButton.PointToScreen(Point.Empty).X + RightEdge(form.NextButton)) / 2;
+            Assert.InRange(Math.Abs(previewMiddle - arrowsMiddle), 0, 3);
+            Assert.True(RightEdge(form.LabelCounter) < form.PreviousButton.PointToScreen(Point.Empty).X, "the counter is left of the arrows");
+            Assert.True(form.LabelCounter.Font.Bold, "the counter is bold");
 
             Assert.NotNull(form.PrintButton.Image);
             Assert.False(form.PrintButton.TabStop); // Tab only goes through the four fields
+        });
+    }
+
+    [Fact]
+    public void TheArrowsAndPrint_AreWiderThanBefore_AndGrowWithThePreview_ButNotTooMuch()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+            form.OpenLabelFiles(Samples.File(Samples.LabelXml), null);
+            window.Pump();
+
+            int height = form.NextButton.Height;
+            int standard = form.NextButton.Width;
+            Assert.True(standard > 72, "wider than the 72 of 1.1.1: " + standard); // the standard window, at 100%
+
+            form.Width += 400; // the preview column grows
+            window.Pump();
+            Assert.True(form.NextButton.Width > standard, $"{form.NextButton.Width} after {standard}");
+            Assert.Equal(height, form.NextButton.Height); // the height stays
+
+            form.Width += 2000; // a very wide window: not wider than the maximum
+            window.Pump();
+            Assert.Equal(120, form.NextButton.Width);
+            foreach (Button button in new[] { form.PreviousButton, form.PrintButton })
+            {
+                Assert.Equal(form.NextButton.Size, button.Size);
+            }
+
+            form.DragColumnDivider(form.Workspace.Width); // the preview as narrow as it can be: everything still fits
+            window.Pump();
+            Assert.True(RightEdge(form.LabelCounter) < form.PreviousButton.PointToScreen(Point.Empty).X);
+            Assert.True(RightEdge(form.NextButton) < form.PrintButton.PointToScreen(Point.Empty).X);
+            Assert.Equal(RightEdge(form.Preview), RightEdge(form.PrintButton));
         });
     }
 
@@ -384,20 +425,65 @@ public class MainFormTests
     }
 
     [Fact]
-    public void Row1_StartsWithTheDescription_ThereIsNoBoldTitleAboveIt()
+    public void Row1_StartsWithTheFileLines_AndOnlyTheLineBelowTheLanguageIsLeft()
     {
         Sta.Run(() =>
         {
             using var window = new Window();
             MainForm form = window.Form;
 
-            // Between the divider under the language and the description there is nothing else.
-            Panel firstDivider = form.Dividers[0];
-            int belowDivider = Top(firstDivider) + firstDivider.Height;
-            Assert.InRange(Top(form.FileDescription) - belowDivider, 0, 30);
-            Assert.DoesNotContain(form.FileDescription.Parent!.Controls.OfType<Label>(),
-                label => label != form.FileDescription && Top(label) < Top(form.FileDescription) && Top(label) > belowDivider);
+            // The description is no longer a text above the path boxes (it is the hover text of the "?" icons), and the
+            // divider between row 1 and row 2 is gone (Daan, 2026-10-26).
+            Panel divider = Assert.Single(form.Dividers);
+            int belowDivider = Top(divider) + divider.Height;
+            Assert.InRange(Top(form.XmlFileBox.Parent!) - belowDivider, 0, 20);
+            Assert.True(Top(form.EditorCaption) > Top(form.FileStatus) + form.FileStatus.Height, "room between the status line and row 2");
         });
+    }
+
+    [Theory]
+    [InlineData(AppLanguage.Dutch)]
+    [InlineData(AppLanguage.French)]
+    [InlineData(AppLanguage.English)]
+    public void TheHowToIcons_SitBeforeTheCaptions_AndShowTheDescription(AppLanguage language)
+    {
+        Sta.Run(() =>
+        {
+            using var scope = new LanguageScope(language);
+            using var window = new Window();
+            MainForm form = window.Form;
+
+            foreach ((PictureBox icon, Label caption) in new[] { (form.XmlHowToPicture, form.XmlFileCaption), (form.CsvHowToPicture, form.CsvFileCaption) })
+            {
+                Assert.NotNull(icon.Image);
+                Assert.Equal(form.UserGuidePicture.Size, icon.Size); // the same small icon size as the user guide
+                Assert.True(RightEdge(icon) <= caption.PointToScreen(Point.Empty).X, "the icon comes before the caption");
+                Assert.InRange(Top(icon) + icon.Height / 2 - (Top(caption) + caption.Height / 2), -1, 1); // in line with it
+
+                string? tip = form.HowToToolTip.GetToolTip(icon);
+                Assert.Equal(MainForm.WrapForToolTip(Strings.FileDescription, MainForm.HowToLineLength), tip);
+            }
+
+            // The icons start at the left edge of the window's content, like the status line below them.
+            Assert.Equal(form.XmlHowToPicture.PointToScreen(Point.Empty).X, form.FileStatus.PointToScreen(Point.Empty).X);
+        });
+    }
+
+    [Fact]
+    public void TheHowToText_IsCutIntoShortLines_WithoutLosingAWord()
+    {
+        foreach (AppLanguage language in Enum.GetValues<AppLanguage>())
+        {
+            using var scope = new LanguageScope(language);
+            string text = Strings.FileDescription;
+            string wrapped = MainForm.WrapForToolTip(text, MainForm.HowToLineLength);
+
+            Assert.All(wrapped.Split('\n'), line => Assert.True(line.Length <= MainForm.HowToLineLength, line));
+            Assert.Contains("\n\n", wrapped); // an empty line between the two paragraphs
+            Assert.Equal(
+                text.Split((char[])[' ', '\n'], StringSplitOptions.RemoveEmptyEntries),
+                wrapped.Split((char[])[' ', '\n'], StringSplitOptions.RemoveEmptyEntries));
+        }
     }
 
     /// <summary>Gives a control a mouse event as Windows would (left button), at x in its own coordinates.</summary>
@@ -423,26 +509,6 @@ public class MainFormTests
 
             Assert.Equal(previewHeight + 100, form.Preview.Height);
             Assert.Equal(fileBoxTop, Top(form.XmlFileBox) - Top(form));
-        });
-    }
-
-    [Theory]
-    [InlineData(AppLanguage.Dutch)]
-    [InlineData(AppLanguage.French)]
-    [InlineData(AppLanguage.English)]
-    public void TheDescription_IsAsWideAsTheFileRow_AndHasRoomForAllItsLines(AppLanguage language)
-    {
-        Sta.Run(() =>
-        {
-            using var scope = new LanguageScope(language);
-            using var window = new Window();
-            Label description = window.Form.FileDescription;
-            Control fileRow = window.Form.XmlBrowseButton.Parent!;
-
-            Assert.Equal(fileRow.Width, description.Width);
-            Assert.True(description.Height >= description.GetPreferredSize(new Size(description.Width, 0)).Height);
-            Assert.True(description.Height >= 2 * description.Font.Height, "two paragraphs: at least two lines");
-            Assert.True(Top(description) + description.Height <= Top(fileRow), "the description stays above the path box");
         });
     }
 
@@ -509,7 +575,8 @@ public class MainFormTests
             window.Form.LanguageBox.SelectedIndex = (int)AppLanguage.English;
 
             Assert.Equal("Save template", window.Form.SaveButton.Text);
-            Assert.Equal(Strings.FileDescription, window.Form.FileDescription.Text);
+            Assert.Equal(MainForm.WrapForToolTip(Strings.FileDescription, MainForm.HowToLineLength),
+                window.Form.HowToToolTip.GetToolTip(window.Form.CsvHowToPicture));
             Assert.Equal(Strings.StatusNothingOpen, window.Form.FileStatus.Text);
             Assert.Equal("en", window.Settings.Language);
             Assert.True(window.SaveCount > 0);

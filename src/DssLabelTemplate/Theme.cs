@@ -107,6 +107,12 @@ internal static class Theme
     /// </summary>
     public static readonly Color XmlBackground = ColorTranslator.FromHtml("#E8E8E8");
 
+    /// <summary>
+    /// The gray layer over the window while a big file is opened (<see cref="BusyOverlay"/>; Daan, 2026-10-26, asked for
+    /// gray). Not part of the icon palette. It is see-through (45%), the "loading" box on it is white with navy text.
+    /// </summary>
+    public static readonly Color BusyShade = ColorTranslator.FromHtml("#808080");
+
     public static readonly Color XmlTag = DarkBlue;         // <PrintLabel>, </Text>, the < > and /> around them (bold)
     public static readonly Color XmlAttributeName = DarkBlue; // X=, FontSize=
     public static readonly Color XmlValue = Navy;            // "70", "BARCODE128A" (on a very pale blue)

@@ -35,8 +35,11 @@ internal class MainForm : Form
     private static readonly Size ButtonSize = new(100, 28);
 
     // The two arrows and the print button below the preview: twice the size of the 36 x 28 they had next to the title
-    // (Daan, 2026-10-25: easier to hit at the reprint station).
+    // (Daan, 2026-10-25: easier to hit at the reprint station). This is their SMALLEST size: they grow with the preview
+    // column up to NavigationButtonMaximumWidth (Daan, 2026-10-26: wider arrows, print as wide; FitNavigationButtons).
     private static readonly Size NavigationButtonSize = new(72, 56);
+    private const int NavigationButtonMaximumWidth = 120;
+    private const int NavigationSideRoom = 12; // at least this much room between an arrow and the counter or print
 
     // Dragging the vertical line: the preview column keeps at least this width (at 100%), so the label size still fits
     // next to a few letters of its title. (For the editor column see MinimumEditorColumnWidth.)
@@ -64,6 +67,11 @@ internal class MainForm : Form
     private static readonly Size LogoSize = new(35, 32);
     private static readonly Size UserGuideIconSize = new(16, 16);
 
+    // The "?" icon before each path caption (at 100%), and the longest line of its hover text (in characters): a WinForms
+    // tooltip does not wrap by itself, a paragraph would be one line as wide as the screen.
+    private static readonly Size HowToIconSize = new(16, 16);
+    internal const int HowToLineLength = 80;
+
     // The preview follows the text this long after the last key press (not after every letter).
     private const int PreviewDelayMilliseconds = 300;
 
@@ -74,7 +82,8 @@ internal class MainForm : Form
     internal readonly Label CreditLabel = new();
     internal readonly Label VersionLabel = new();
     internal readonly PictureBox UserGuidePicture = new();
-    internal readonly Label FileDescription = new(); // the two kinds of label files, below the caption
+    internal readonly PictureBox XmlHowToPicture = new(); // the "?" before "Template of label-xml:": the two kinds of label files
+    internal readonly PictureBox CsvHowToPicture = new(); // the same "?" before "Label-csv:"
     internal readonly Label XmlFileCaption = new();  // "Template of label-xml:"
     internal readonly TextBox XmlFileBox = new();    // the path of the file in the editor
     internal readonly RoundedButton XmlBrowseButton = new();
@@ -108,6 +117,9 @@ internal class MainForm : Form
     internal readonly RoundedButton SaveButton = new(); // "Template opslaan", left of the view buttons, only after a change
 
     private readonly ToolTip _toolTip = new();
+
+    // The hover text of the "?" icons is long: it stays up longer than the standard 5 seconds (32767 ms is the maximum).
+    internal readonly ToolTip HowToToolTip = new() { AutoPopDelay = 32767, InitialDelay = 200 };
     private readonly System.Windows.Forms.Timer _previewTimer = new() { Interval = PreviewDelayMilliseconds };
 
     // The open file. Null = nothing opened yet (Save then asks for a name).
@@ -229,23 +241,18 @@ internal class MainForm : Form
         AddRow(body, ref row, topRow);
         AddDivider(body, ref row, new Padding(0, 12, 0, 12));
 
-        // Row 1: the label files: what the two kinds of files are, the path boxes, and what is open now. (No bold title
-        // "Labelbestanden" above it any more, Daan 2026-10-25: the description says enough.)
-        // These two texts get their size from the window (FitFileTexts), never from the table: see TsDssConverter's
-        // "layout rules learned the hard way" (a table that wraps a label itself kept rows ten lines high at 125% / 150%).
-        FileDescription.AutoSize = false;
-        FileDescription.Margin = new Padding(0, 8, 0, 6);
-        FileDescription.ForeColor = Theme.Navy;
-        AddRow(body, ref row, FileDescription);
-
+        // Row 1: the label files: the path boxes and what is open now. The description of the two kinds of files is no
+        // longer a text here but the hover text of the "?" icons before the path captions (Daan, 2026-10-26: more height
+        // for row 2). The status line gets its size from the window (FitFileTexts), never from the table: see
+        // TsDssConverter's "layout rules learned the hard way".
         _fileRow = BuildFileRows();
         AddRow(body, ref row, _fileRow);
 
         AddRow(body, ref row, BuildStatusRow());
 
         _fileRow.SizeChanged += (sender, e) => FitFileTexts();
-        FileDescription.FontChanged += (sender, e) => FitFileTexts(); // the window moved to a screen with another scaling
-        AddDivider(body, ref row, new Padding(0, 16, 0, 12));
+        FileStatus.FontChanged += (sender, e) => FitFileTexts(); // the window moved to a screen with another scaling
+        // (No divider line between row 1 and row 2 any more, Daan 2026-10-26: the status line has room below it instead.)
 
         // Row 2: the editor and the preview, and below them the logo and the big buttons (there is no footer row any
         // more: Close is gone and Save sits above the editor, Daan 2026-10-25). Takes the rest of the height.
@@ -393,8 +400,7 @@ internal class MainForm : Form
     }
 
     /// <summary>
-    /// Gives the description and the status line below and above the path box their size: as wide as that row, and as
-    /// high as the description needs at that width (the status line is one line, cut off with "…").
+    /// Gives the status line below the path boxes its size: as wide as that row, one line high (cut off with "…").
     /// </summary>
     private void FitFileTexts()
     {
@@ -404,11 +410,6 @@ internal class MainForm : Form
         }
 
         int width = _fileRow.Width;
-        var description = new Size(width, FileDescription.GetPreferredSize(new Size(width, 0)).Height);
-        if (FileDescription.Size != description) // also stops the loop: a new height lays the table out again
-        {
-            FileDescription.Size = description;
-        }
 
         // The status line has the whole width (the label size moved to the preview title, Daan 2026-10-25).
         var status = new Size(Math.Max(0, width - FileStatus.Margin.Horizontal), FileStatus.PreferredHeight);
@@ -424,7 +425,7 @@ internal class MainForm : Form
         FileStatus.AutoSize = false;     // its size comes from FitFileTexts
         FileStatus.AutoEllipsis = true;  // a long csv path ends in "…" instead of a second line
         FileStatus.Anchor = AnchorStyles.Left;
-        FileStatus.Margin = new Padding(0, 6, 0, 0);
+        FileStatus.Margin = new Padding(0, 6, 0, 12); // the room below it replaces the divider line above row 2
         FileStatus.ForeColor = Theme.Navy;
         return FileStatus;
     }
@@ -496,30 +497,83 @@ internal class MainForm : Form
     }
 
     /// <summary>
-    /// Row 1: two lines, each a caption, a path box (Enter opens what was typed) and a Browse button:
+    /// Row 1: two lines, each a "?" icon (hover: what the two kinds of label files are), a caption, a path box (Enter
+    /// opens what was typed) and a Browse button:
     ///   "Template of label-xml:"  the file in the editor;
     ///   "Label-csv:"              the data for a template (not used, and greyed out, with a label-xml).
     /// </summary>
     private Control BuildFileRows()
     {
-        // Captions, frames and buttons in AutoSize columns, only the frames stretch (anchored left and right in the Percent
-        // column), so the captions never wrap and the buttons are never shrunk.
-        var rows = new TableLayoutPanel { ColumnCount = 3, RowCount = 2, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        // Icons, captions, frames and buttons in AutoSize columns, only the frames stretch (anchored left and right in the
+        // Percent column), so the captions never wrap and the icons and buttons are never shrunk.
+        var rows = new TableLayoutPanel { ColumnCount = 4, RowCount = 2, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        AddFileLine(rows, 0, XmlFileCaption, XmlFileBox, XmlBrowseButton, OpenTypedXmlFile, BrowseForXmlFile);
-        AddFileLine(rows, 1, CsvFileCaption, CsvFileBox, CsvBrowseButton, OpenTypedCsvFile, BrowseForCsvFile);
+        SetUpHowToPicture(XmlHowToPicture);
+        SetUpHowToPicture(CsvHowToPicture);
+        AddFileLine(rows, 0, XmlHowToPicture, XmlFileCaption, XmlFileBox, XmlBrowseButton, OpenTypedXmlFile, BrowseForXmlFile);
+        AddFileLine(rows, 1, CsvHowToPicture, CsvFileCaption, CsvFileBox, CsvBrowseButton, OpenTypedCsvFile, BrowseForCsvFile);
         return rows;
     }
 
+    /// <summary>
+    /// The "?" icon before a path caption. Its text (the two kinds of label files) appears when the mouse rests on it,
+    /// and also when it is tapped or clicked: a touch screen has no mouse to rest.
+    /// </summary>
+    private void SetUpHowToPicture(PictureBox picture)
+    {
+        picture.Image = AppIcons.HowTo();
+        picture.SizeMode = PictureBoxSizeMode.Zoom;
+        picture.Size = HowToIconSize;
+        picture.BackColor = Theme.White;
+        picture.Cursor = Cursors.Help;
+        picture.Click += (sender, e) => HowToToolTip.Show(HowToToolTip.GetToolTip(picture), picture, 0, picture.Height + 4, HowToToolTip.AutoPopDelay);
+        picture.MouseLeave += (sender, e) => HowToToolTip.Hide(picture); // also ends the text that a click showed
+    }
+
+    /// <summary>
+    /// The description of the two kinds of label files, cut into lines of at most <paramref name="maxLineLength"/>
+    /// characters (between words) for the tooltip, with an empty line between the paragraphs.
+    /// </summary>
+    internal static string WrapForToolTip(string text, int maxLineLength)
+    {
+        var paragraphs = new List<string>();
+        foreach (string paragraph in text.Split('\n'))
+        {
+            var lines = new List<string>();
+            string line = "";
+            foreach (string word in paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (line.Length > 0 && line.Length + 1 + word.Length > maxLineLength)
+                {
+                    lines.Add(line);
+                    line = word;
+                }
+                else
+                {
+                    line = line.Length == 0 ? word : line + " " + word;
+                }
+            }
+
+            lines.Add(line);
+            paragraphs.Add(string.Join("\n", lines));
+        }
+
+        return string.Join("\n\n", paragraphs);
+    }
+
     /// <summary>One line of <see cref="BuildFileRows"/>; the second line has some room above it.</summary>
-    private static void AddFileLine(TableLayoutPanel rows, int row, Label caption, TextBox box, RoundedButton browse, Action openTyped, Action openBrowsed)
+    private static void AddFileLine(TableLayoutPanel rows, int row, PictureBox howTo, Label caption, TextBox box, RoundedButton browse, Action openTyped, Action openBrowsed)
     {
         int top = row == 0 ? 0 : 6;
+
+        howTo.Anchor = AnchorStyles.Left; // in the middle of the line's height, like the caption
+        howTo.Margin = new Padding(0, top, 6, 0);
 
         caption.AutoSize = true;
         caption.Anchor = AnchorStyles.Left; // in the middle of the line's height
@@ -548,9 +602,10 @@ internal class MainForm : Form
         Theme.StyleSecondaryButton(browse);
         browse.Click += (sender, e) => openBrowsed();
 
-        rows.Controls.Add(caption, 0, row);
-        rows.Controls.Add(frame, 1, row);
-        rows.Controls.Add(browse, 2, row);
+        rows.Controls.Add(howTo, 0, row);
+        rows.Controls.Add(caption, 1, row);
+        rows.Controls.Add(frame, 2, row);
+        rows.Controls.Add(browse, 3, row);
     }
 
     /// <summary>
@@ -742,7 +797,10 @@ internal class MainForm : Form
         CsvGrid.BorderStyle = BorderStyle.None; // the rounded ContentFrame around it is the border
         CsvGrid.BackgroundColor = Theme.White;
         CsvGrid.GridColor = Theme.PaleBlue;
-        CsvGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
+        // NOT AutoSizeColumnsMode.AllCells: that measures every cell of every row when the table is shown, about 1 second
+        // per 1000 rows, and the window froze while doing it (Daan, 2026-10-26). FitCsvColumns measures one cell per column.
+        CsvGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+        CsvGrid.FontChanged += (sender, e) => FitCsvColumns(); // the window moved to a screen with another scaling
         CsvGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
 
         // Bigger than the rest of the window, for a touch screen (Daan, 2026-10-25): the font 4 points bigger, and the rows
@@ -796,7 +854,47 @@ internal class MainForm : Form
             }
         }
 
+        FitCsvColumns();
         _selectingCsvRow = false;
+    }
+
+    /// <summary>
+    /// Makes every column of the csv table as wide as its title and its longest text (the one with the most characters).
+    /// Only that one cell is measured, not all of them: fast for a csv with thousands of lines. A text with as many but
+    /// wider letters can be cut off with "…"; the column can then be made wider with the mouse.
+    /// </summary>
+    private void FitCsvColumns()
+    {
+        LabelCsv? csv = _csv;
+        if (csv == null || CsvGrid.Columns.Count != csv.Columns.Count + 1 || CsvGrid.Rows.Count != csv.Rows.Count)
+        {
+            return; // nothing in the table (or it is being filled: fitted at the end of FillCsvGrid)
+        }
+
+        foreach (DataGridViewColumn column in CsvGrid.Columns)
+        {
+            // The longest text, from the csv itself (the first column is the label number: the last one is the longest).
+            int longestRow = -1, longestLength = -1;
+            for (int row = 0; row < csv.Rows.Count; row++)
+            {
+                int length = column.Index == 0
+                    ? (row + 1).ToString(System.Globalization.CultureInfo.InvariantCulture).Length
+                    : csv.Rows[row].TryGetValue(csv.Columns[column.Index - 1], out string? value) ? value.Length : 0;
+                if (length > longestLength)
+                {
+                    longestRow = row;
+                    longestLength = length;
+                }
+            }
+
+            int width = column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.ColumnHeader, fixedHeight: true);
+            if (longestRow >= 0)
+            {
+                width = Math.Max(width, CsvGrid.Rows[longestRow].Cells[column.Index].PreferredSize.Width);
+            }
+
+            column.Width = width;
+        }
     }
 
     /// <summary>Shows the template text (false) or the csv table (true) in the left column.</summary>
@@ -872,16 +970,18 @@ internal class MainForm : Form
     }
 
     /// <summary>
-    /// Below the preview, in the middle (Daan, 2026-10-25): "2 / 3", the two arrows (only when there is more than one
-    /// label) and the print button (as soon as there is a label), all twice as big as the other buttons. The row is always
-    /// as high as these buttons, also when they are hidden, so the preview never jumps.
+    /// Below the preview, as wide as the preview (Daan, 2026-10-26): "2 / 3" against its left edge, the two arrows in the
+    /// middle (only when there is more than one label) and the print button against its right edge (as soon as there is
+    /// a label); the three buttons twice as high as the other buttons and as wide as fits (FitNavigationButtons). The row
+    /// is always as high as these buttons, also when they are hidden, so the preview never jumps.
     /// </summary>
     private Control BuildPreviewNavigation()
     {
         LabelCounter.AutoSize = true;
         LabelCounter.Anchor = AnchorStyles.Left;
-        LabelCounter.Margin = new Padding(0, 0, 8, 0);
+        LabelCounter.Margin = new Padding(0);
         LabelCounter.ForeColor = Theme.Navy;
+        LabelCounter.Font = new Font(Font, FontStyle.Bold); // Daan, 2026-10-26: easier to read at the reprint station
 
         // The arrow signs twice as big too, to fit the bigger buttons.
         var arrowFont = new Font(Font.FontFamily, Font.SizeInPoints * 2, FontStyle.Regular, GraphicsUnit.Point);
@@ -899,33 +999,56 @@ internal class MainForm : Form
         PreviousButton.Click += (sender, e) => ShowLabel(Preview.Index - 1);
         NextButton.Click += (sender, e) => ShowLabel(Preview.Index + 1);
 
-        // The print button: right of the arrows, the same size, the printer icon instead of a text. A little more room in
-        // front of it than between the arrows: it does something else than going through the labels.
+        // The print button: against the right edge of the preview, the same size as the arrows, the printer icon instead
+        // of a text.
         PrintButton.Size = NavigationButtonSize;
-        PrintButton.Margin = new Padding(12, 0, 0, 0);
+        PrintButton.Anchor = AnchorStyles.Right;
+        PrintButton.Margin = new Padding(0);
         PrintButton.Image = AppIcons.Print();
         PrintButton.IconHeight = 2 * RoundedButton.DefaultIconHeight;
         Theme.StyleSecondaryButton(PrintButton);
         PrintButton.Click += (sender, e) => PrintLabels();
 
-        // AutoSize columns only (the buttons have a fixed size); the whole row is centred below the preview.
+        // Four columns: two equal Percent columns (the counter at the left of the first, print at the right of the
+        // second) around two AutoSize columns with the arrows, which so stay exactly in the middle. This table is NOT
+        // AutoSize: it is as wide as the preview (anchored left and right in the same column) and as high as the buttons
+        // (a fixed height, not stretched: its row of the workspace is AutoSize).
         PreviewNavigation.ColumnCount = 4;
         PreviewNavigation.RowCount = 1;
-        PreviewNavigation.AutoSize = true;
-        PreviewNavigation.Anchor = AnchorStyles.Top; // centred in its cell
+        PreviewNavigation.AutoSize = false;
+        PreviewNavigation.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
         PreviewNavigation.Margin = new Padding(0, 20, 0, 0); // the room the footer with Save / Close had above it
-        PreviewNavigation.MinimumSize = new Size(0, NavigationButtonSize.Height);
-        for (int i = 0; i < 4; i++)
-        {
-            PreviewNavigation.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        }
-
-        PreviewNavigation.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        PreviewNavigation.Height = NavigationButtonSize.Height;
+        PreviewNavigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        PreviewNavigation.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        PreviewNavigation.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        PreviewNavigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        PreviewNavigation.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         PreviewNavigation.Controls.Add(LabelCounter, 0, 0);
         PreviewNavigation.Controls.Add(PreviousButton, 1, 0);
         PreviewNavigation.Controls.Add(NextButton, 2, 0);
         PreviewNavigation.Controls.Add(PrintButton, 3, 0);
+        PreviewNavigation.SizeChanged += (sender, e) => FitNavigationButtons();
         return PreviewNavigation;
+    }
+
+    /// <summary>
+    /// The arrows and print get the same width: as wide as fits in the row below the preview (four button widths, the
+    /// room between the arrows and room on both sides of them), at least the 72 they always had and at most 120 (at 100%).
+    /// Called when the row changes width (the window, the column line).
+    /// </summary>
+    private void FitNavigationButtons()
+    {
+        int room = PreviewNavigation.Width - PreviousButton.Margin.Right - 2 * LogicalToDeviceUnits(NavigationSideRoom);
+        int width = Math.Max(LogicalToDeviceUnits(NavigationButtonSize.Width),
+                             Math.Min(LogicalToDeviceUnits(NavigationButtonMaximumWidth), room / 4));
+        foreach (RoundedButton button in new[] { PreviousButton, NextButton, PrintButton })
+        {
+            if (button.Width != width) // also stops the loop: a new width lays the row out again
+            {
+                button.Width = width;
+            }
+        }
     }
 
     /// <summary>The company logo at the bottom left of the window (below the editor), opens rogiers.be.</summary>
@@ -966,7 +1089,9 @@ internal class MainForm : Form
         UpdateTitle();
         VersionLabel.Text = Strings.AppVersion(AppInfo.Version);
         _toolTip.SetToolTip(UserGuidePicture, Strings.UserGuideTooltip);
-        FileDescription.Text = Strings.FileDescription;
+        string howTo = WrapForToolTip(Strings.FileDescription, HowToLineLength);
+        HowToToolTip.SetToolTip(XmlHowToPicture, howTo);
+        HowToToolTip.SetToolTip(CsvHowToPicture, howTo);
         XmlFileCaption.Text = Strings.XmlFileCaption;
         CsvFileCaption.Text = Strings.CsvFileCaption;
         XmlBrowseButton.Text = Strings.Browse;
@@ -1006,6 +1131,7 @@ internal class MainForm : Form
     /// </summary>
     internal bool OpenLabelFiles(string xmlPath, string? csvPath, bool quiet = false)
     {
+        using BusyOverlay? busy = BusyOverlay.ShowIfBig(this, BusyOverlay.SizeOfFiles(xmlPath, csvPath)); // gone at the end
         LabelCsv? csv = null;
         if (!TryRead(() => TextFile.Read(xmlPath), quiet, out TextFileContent? content) ||
             (csvPath != null && !TryRead(() => LabelCsv.Read(csvPath), quiet, out csv)))
@@ -1027,6 +1153,8 @@ internal class MainForm : Form
     /// </summary>
     internal bool OpenXmlFile(string path, bool quiet = false)
     {
+        // A big file: the gray layer with "loading" until the end of this method. The open csv is worked through again too.
+        using BusyOverlay? busy = BusyOverlay.ShowIfBig(this, BusyOverlay.SizeOfFiles(path, _csv?.FilePath));
         if (!TryRead(() => TextFile.Read(path), quiet, out TextFileContent? content))
         {
             return false;
@@ -1050,6 +1178,7 @@ internal class MainForm : Form
     /// </summary>
     internal bool OpenCsvFile(string? path, bool quiet = false)
     {
+        using BusyOverlay? busy = BusyOverlay.ShowIfBig(this, BusyOverlay.SizeOfFiles(path)); // gone at the end
         LabelCsv? csv = null;
         if (path != null && !TryRead(() => LabelCsv.Read(path), quiet, out csv))
         {

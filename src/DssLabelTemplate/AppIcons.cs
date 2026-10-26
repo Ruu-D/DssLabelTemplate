@@ -78,6 +78,15 @@ internal static class AppIcons
         return TrimmedAndScaled("print.png", 72);
     }
 
+    /// <summary>
+    /// The "?" icon before the two path captions (media\howto.png, a navy circle with a white question mark): its hover
+    /// text describes the two kinds of label files. Shown 16 pixels high at 100%, so 64 is enough for a screen at 400%.
+    /// </summary>
+    public static Image HowTo()
+    {
+        return TrimmedAndScaled("howto.png", 64);
+    }
+
     /// <summary>A built-in picture without its transparent margin, made smaller once (high quality) to the given long side.</summary>
     private static Image TrimmedAndScaled(string resourceName, int longSide)
     {

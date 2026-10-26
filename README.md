@@ -32,7 +32,9 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 | **First release** | **1.0.0** |
 | Print button (reprint on a Zebra ZD220), real QR codes, draggable column divider, new banner text, touch-friendly layout | 1.1.0, customer test version; waiting for a test on the real printer |
 | Window size / position / maximised and column divider remembered; label CSV shown as a table first | Done (1.1.1, published) |
-| Sheet map can be turned (`SheetRotationInViewer` in `settings.json`), for a label PC on a turnable console | Done (not released yet) |
+| Sheet map can be turned (`SheetRotationInViewer` in `settings.json`), for a label PC on a turnable console | Done (1.1.2) |
+| File description moved into "?" icons (hover or tap) and one divider removed: more height for the editor and preview | Done (1.1.2) |
+| Big label CSV files open about 3 x faster, with a gray "loading" layer that blocks clicks meanwhile; wider arrow and print buttons (counter left, print right) | Done (1.1.2) |
 
 Third-party components: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence) and
 [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence).

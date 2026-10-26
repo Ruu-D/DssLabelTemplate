@@ -43,7 +43,7 @@ internal static class Strings
     public const string LanguageEnglish = "English - Engels";
 
     // ---- Row 1: the two files ----
-    /// <summary>Above the path boxes: the two kinds of label files of Duivestein (DSS Software Interface, "Label").</summary>
+    /// <summary>The hover text of the "?" icons before the path boxes: the two kinds of label files of Duivestein (DSS Software Interface, "Label"). Cut into tooltip lines by MainForm.WrapForToolTip.</summary>
     public static string FileDescription => T(
         "Labeltemplate + label-csv: het template (xml) beschrijft de opmaak van één label, met variabelen zoals $LENGTH$; de " +
         "label-csv bevat per label één regel met de plaats op de plaat en de gegevens die bij het afdrukken worden ingevuld.\n" +
@@ -147,6 +147,9 @@ internal static class Strings
         "Sleep om de kolommen breder of smaller te maken; dubbelklik voor twee gelijke helften",
         "Faites glisser pour élargir ou réduire les colonnes ; double-clic pour deux moitiés égales",
         "Drag to make the columns wider or narrower; double-click for two equal halves");
+
+    /// <summary>In the white box on the gray layer while a big file is opened (BusyOverlay).</summary>
+    public static string Loading => T("Bezig met laden…", "Chargement…", "Loading…");
 
     public static string PreviewNoFile => T(
         "Kies hierboven een labeltemplate (met zijn label-csv) of een label-xml.",

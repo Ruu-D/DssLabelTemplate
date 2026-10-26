@@ -1,6 +1,6 @@
 # Changelog
 
-## Not released yet — 2026-10-26
+## 1.1.2 — 2026-10-26 (after Daan's test of 1.1.1)
 
 - **The sheet map can be turned:** a new setting `SheetRotationInViewer` in `settings.json` ONLY (not in the window,
   Daan's request): 0, 90, 180, 270 or -90, -180, -270 degrees, counter-clockwise (a negative value = clockwise). The
@@ -8,7 +8,24 @@
   along its length. Only the sheet map under the label turns (the sheet and all its labels); the label itself stays upright.
   Any other value (45, 360, …) becomes 0. Not in the file yet = 0, and the program writes it the next time it saves its
   settings (e.g. when it is closed).
-- 160 tests (sheet-map geometry, the setting). Rendered at 0°, 90° and -90° with Daan's sample (sheet 2850 x 2100).
+- **More height for the editor / csv table and the preview** (Daan): the description of the two kinds of label files
+  is no longer a text above the path boxes but the hover text of a "?" icon (`media\howto.png`) before each path
+  caption; tapping or clicking the icon shows it too (touch screen). The text is cut into lines of at most 80
+  characters and stays up 32 seconds. The divider line between the status line and the two columns is gone.
+- **Big files open about 3 x faster** (Daan: the window froze for almost 6 seconds). The cause, measured: the csv table
+  sized its columns by measuring every cell of every line when it was shown (about 1 s per 1000 lines). Now every column
+  is sized once, from its title and its longest text. 1000 lines: 1.3 → 0.4 s; 5000 lines (1.4 MB): about 6 → 1.7 s.
+- **A gray "loading" layer** while files of 200 KB or more are opened: see-through gray over the whole window (also the
+  title bar) with a white box "Bezig met laden…" / "Chargement…" / "Loading…" and the wait cursor. Clicks and keys
+  during that time are caught by the layer and ignored, instead of being carried out afterwards. Small files: no layer.
+- **The buttons below the preview:** the counter `2 / 3` against the left edge of the preview, the arrows in the middle,
+  the print button against its right edge; the counter in bold. The three buttons have the same width, wider than before: they grow with
+  the preview column, from 72 up to 120 px at 100% (100 in the standard window); the height is unchanged.
+- 165 tests (sheet-map geometry, the setting, the "?" icons and their text, big files, the gray layer, the button row).
+  Rendered at 0°, 90° and -90° with Daan's sample (sheet 2850 x 2100), and the whole window at a real 150%.
+- **Delivery:** `dist\v1.1.2\DssLabelTemplate.exe`, 53,208,020 bytes, file version 1.1.2.0, SHA-256
+  `4ea7e7fb80a0628ea75e45dc787dd407c95ed4db93f6eb4dda37a667fc58f86c`. Built by `publish.cmd` after all 165 tests passed;
+  it contains `media\Print.png` as it was in the working copy (changed by Daan). The exe itself was not started.
 
 ## 1.1.1 — 2026-10-25 (after Daan's test of 1.1.0)
 
