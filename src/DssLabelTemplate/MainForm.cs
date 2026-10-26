@@ -187,6 +187,8 @@ internal class MainForm : Form
         Preview.LabelSize = new SizeF((float)_settings.LabelLength, (float)_settings.LabelWidth);
         Preview.SheetRotation = _settings.SheetRotationInViewer; // only in settings.json, not in the window
         Preview.ReferenceCorner = SheetCorners.Parse(_settings.SheetReferenceCorner) ?? SheetCorner.BottomLeft; // the same
+        Preview.ShowRotation = _settings.ShowLabelRotation; // the same
+        Preview.RotationClockwise = _settings.LabelRotationIsClockwise; // the same
         LabelLengthBox.TextChanged += (sender, e) => OnLabelSizeChanged(LabelLengthBox);
         LabelWidthBox.TextChanged += (sender, e) => OnLabelSizeChanged(LabelWidthBox);
 
@@ -1360,8 +1362,27 @@ internal class MainForm : Form
                 }
             }
 
+            // PrintLabelWithRotation (settings.json): only a square label can be printed turned; another shape: ask.
+            SizeF? turnedLabelSize = null;
+            if (_settings.PrintLabelWithRotation)
+            {
+                if (LabelPrinter.IsSquare(Preview.LabelSize))
+                {
+                    turnedLabelSize = Preview.LabelSize;
+                }
+                else
+                {
+                    string question = Strings.RotationNeedsSquareLabelQuestion(LabelXml.Format(Preview.LabelSize.Width), LabelXml.Format(Preview.LabelSize.Height));
+                    if (MessageBox.Show(this, question, Strings.AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                    {
+                        return;
+                    }
+                }
+            }
+
             string? folder = _currentFile == null ? null : Path.GetDirectoryName(_currentFile);
-            LabelPrinter.Print(document, numbers.Select(number => Preview.Labels!.Labels[number]).ToList(), folder);
+            LabelPrinter.Print(document, numbers.Select(number => Preview.Labels!.Labels[number]).ToList(), folder, turnedLabelSize,
+                _settings.SheetRotationInViewer, _settings.LabelRotationIsClockwise);
         }
         catch (Exception error) when (error is InvalidPrinterException || error is System.ComponentModel.Win32Exception)
         {

@@ -54,11 +54,21 @@ internal static class LabelPrinter
         return Math.Abs(paper.Width - label.Width) <= PaperTolerance && Math.Abs(paper.Height - label.Height) <= PaperTolerance;
     }
 
+    /// <summary>True when the label is square: only then can it be printed turned (it still fits its paper).</summary>
+    public static bool IsSquare(SizeF label) => Math.Abs(label.Width - label.Height) < 0.001f;
+
     /// <summary>
     /// Prints the labels, one per page, on the printer of the document (chosen in the print dialog). May throw
     /// InvalidPrinterException or Win32Exception (printer gone, spooler stopped); the window reports it.
     /// </summary>
-    public static void Print(PrintDocument document, IReadOnlyList<LabelItem> labels, string? baseFolder)
+    /// <param name="turnedLabelSize">
+    /// Null: every label upright. A size (a SQUARE label, see <see cref="IsSquare"/>): every label turned around the middle
+    /// of that label, by its ROTATION plus <paramref name="sheetRotationInViewer"/> (settings.json: PrintLabelWithRotation).
+    /// </param>
+    /// <param name="sheetRotationInViewer">The turn of the sheet map (degrees counter-clockwise): how the operator sees the sheet.</param>
+    /// <param name="rotationClockwise">True: a positive ROTATION turns clockwise (settings.json: "LabelDirection": "CW").</param>
+    public static void Print(PrintDocument document, IReadOnlyList<LabelItem> labels, string? baseFolder, SizeF? turnedLabelSize = null,
+        int sheetRotationInViewer = 0, bool rotationClockwise = false)
     {
         if (labels.Count == 0)
         {
@@ -70,7 +80,7 @@ internal static class LabelPrinter
         void PrintPage(object? sender, PrintPageEventArgs e)
         {
             var hardMargin = new PointF(e.PageSettings.HardMarginX * MillimetresPerHundredthInch, e.PageSettings.HardMarginY * MillimetresPerHundredthInch);
-            DrawPage(e.Graphics!, hardMargin, labels[next], baseFolder, images);
+            DrawPage(e.Graphics!, hardMargin, labels[next], baseFolder, images, turnedLabelSize, sheetRotationInViewer, rotationClockwise);
             next++;
             e.HasMorePages = next < labels.Count;
         }
@@ -90,10 +100,22 @@ internal static class LabelPrinter
     /// Draws one label on a page: 1 unit = 1 mm, (0, 0) = the top left corner of the PAPER. A printer's drawing starts at
     /// the corner of the area it can print on (the hard margin), so it is moved back by that margin.
     /// </summary>
-    internal static void DrawPage(Graphics g, PointF hardMarginMillimetres, LabelItem label, string? baseFolder, LabelImages images)
+    internal static void DrawPage(Graphics g, PointF hardMarginMillimetres, LabelItem label, string? baseFolder, LabelImages images,
+        SizeF? turnedLabelSize = null, int sheetRotationInViewer = 0, bool rotationClockwise = false)
     {
         g.PageUnit = GraphicsUnit.Millimeter;
         g.TranslateTransform(-hardMarginMillimetres.X, -hardMarginMillimetres.Y);
+
+        // PrintLabelWithRotation: turn the label around its middle as the operator sees it on the sheet (its ROTATION plus
+        // the turn of the sheet map), so it can be stuck on without turning it. Square, so it stays on the same paper.
+        // A quarter turn keeps barcodes and QR codes on whole printer dots (LabelRenderer does that at 0/90/180/270°).
+        if (turnedLabelSize is SizeF size)
+        {
+            int turns = LabelRenderer.QuarterTurnsAsTheOperatorSees(label.Rotation, sheetRotationInViewer, rotationClockwise);
+            g.TranslateTransform(size.Width / 2, size.Height / 2);
+            g.RotateTransform(-90 * turns); // Y counts downwards: negative = counter-clockwise
+            g.TranslateTransform(-size.Width / 2, -size.Height / 2);
+        }
 
         // A thermal label printer only has black and white dots: no grey (anti-aliased) edges, they would come out as
         // a ragged pattern of dots.

@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.1.4 — 2026-10-26 (Daan)
+
+- **Delivery:** `dist\v1.1.4\DssLabelTemplate.exe`, 53,212,137 bytes, file version 1.1.4.0, SHA-256
+  `58e7f644e4380c6adeb5b272ce5904b1138d6a553867e5a992174589de8d9963`. Built by `publish.cmd` after all 210 tests passed;
+  the exe itself was not started.
+
+- **The turned preview and the turned print follow the operator's view:** `ShowLabelRotation` and `PrintLabelWithRotation`
+  now turn the label by its ROTATION **plus `SheetRotationInViewer`** (`LabelRenderer.QuarterTurnsAsTheOperatorSees`).
+  Daan's logic: ROTATION is how the label sits on the sheet; the operator sees the sheet turned by SheetRotationInViewer
+  (standing at the unloading table, facing the screen and the reprint printer) and must stick the printed label on without
+  turning it. Example: ROTATION 0 with SheetRotationInViewer -90 prints a quarter turn clockwise. In 1.1.3 the viewer turn
+  was not added. Packed README updated (an existing README in the program folder is still never replaced).
+- **`LabelDirection`** in `settings.json` ONLY: `"CCW"` (default, the earlier assumption) or `"CW"`: which way a positive
+  ROTATION turns the label (for the turned preview and print). `SheetRotationInViewer` stays counter-clockwise. ROTATION 0
+  = the label upright on the sheet, its bottom towards the Y = 0 edge (confirmed by Daan with his sample and
+  SheetRotationInViewer -90). Explained in the packed README.
+- 210 tests (was 194): printed square labels for ROTATION + viewer combinations (0 / -90, 0 / 270, 90 / -90, 180 / 90,
+  1 / 90), the same with LabelDirection CW (90, 270, 180, 0 / -90, 90 / -90), upright without the setting even with a
+  turned sheet map; LabelDirection loaded (CW / cw / CCW / unknown / missing) and saved, its helper not written. Rendered
+  at a real 150% with SheetRotationInViewer -90.
+
+## 1.1.3 — 2026-10-26 (Daan)
+
+- **Delivery:** `dist\v1.1.3\DssLabelTemplate.exe`, 53,211,033 bytes, file version 1.1.3.0, SHA-256
+  `5b5cf2641134720e02d9edabdefe44de642ebff1b59337d6647c1959ee5e1fb1`. Built by `publish.cmd` after all 194 tests passed;
+  the exe itself was not started.
+
+- **Preview height 60 / 40:** with a sheet map, the map (with the gap above and the margin below it) gets 40 % of the
+  preview's height, the label with its info and problem lines 60 % (was about 70 / 30; `SheetMapShare` 0.40,
+  `LabelPreview.MapHeight`).
+- **`ShowLabelRotation`** in `settings.json` ONLY (default false): the preview shows the label turned by its ROTATION from
+  the csv, counter-clockwise, as it will sit on the sheet. Only the preview.
+- **`PrintLabelWithRotation`** in `settings.json` ONLY (default false): the print is turned by the ROTATION,
+  counter-clockwise, around the middle of the label. Only for a square label; for another size the window asks whether
+  to print upright (three languages, `Strings.RotationNeedsSquareLabelQuestion`).
+- Both explained in the packed README (`program-folder\README.md`). An existing README in the program folder is never
+  replaced, so a PC that already has one does not get these two sections.
+- Rendered at a real 150% (60 x 60 template, ROTATION 0 / 90 / 180 / 270). 194 tests (was 183): the 40 % map, the two
+  settings (off by default, saved and loaded), a printed square label turned to the right quarter for 0 / 90 / 180 / 270 /
+  360 / 1, upright without the setting, the square check.
+
 ## 1.1.2 rebuild — 2026-10-26 (same version number, Daan)
 
 - **Delivery:** `dist\v1.1.2\DssLabelTemplate.exe`, 53,210,028 bytes, file version 1.1.2.0, SHA-256

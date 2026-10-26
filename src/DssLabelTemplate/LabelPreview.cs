@@ -12,7 +12,9 @@ internal class LabelPreview : Control
 {
     private const int Margin16 = 16;   // room around everything, at 100%
     private const int Gap = 8;         // between the parts, at 100%
-    private const float SheetMapShare = 0.25f; // the sheet map gets this part of the height
+    // The sheet map, with the room above and below it, gets this part of the height; the label with its two lines the
+    // rest: 60 % / 40 % (Daan, 2026-10-26; was about 70 / 30).
+    private const float SheetMapShare = 0.40f;
     private const int OriginDot = 9;   // the round zero-point dot on the sheet map, at 100%
     private const int OriginRing = 2;  // white ring around that dot, at 100%
 
@@ -23,6 +25,8 @@ internal class LabelPreview : Control
     private SizeF _labelSize = new((float)AppSettings.DefaultLabelSize, (float)AppSettings.DefaultLabelSize);
     private int _sheetRotation;
     private SheetCorner _referenceCorner = SheetCorner.BottomLeft;
+    private bool _showRotation;
+    private bool _rotationClockwise;
 
     public LabelPreview()
     {
@@ -83,6 +87,35 @@ internal class LabelPreview : Control
         set
         {
             _referenceCorner = value;
+            Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// True: the label is shown turned by its ROTATION, as it will sit on the sheet (<see cref="AppSettings.ShowLabelRotation"/>);
+    /// false: upright, as printed.
+    /// </summary>
+    [System.ComponentModel.Browsable(false)]
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public bool ShowRotation
+    {
+        get => _showRotation;
+        set
+        {
+            _showRotation = value;
+            Invalidate();
+        }
+    }
+
+    /// <summary>True: a positive ROTATION turns the label clockwise (<see cref="AppSettings.LabelDirection"/> "CW").</summary>
+    [System.ComponentModel.Browsable(false)]
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public bool RotationClockwise
+    {
+        get => _rotationClockwise;
+        set
+        {
+            _rotationClockwise = value;
             Invalidate();
         }
     }
@@ -157,7 +190,7 @@ internal class LabelPreview : Control
         int gap = LogicalToDeviceUnits(Gap);
         int line = Font.Height;
         bool hasSheet = label.SheetLength > 0 && label.SheetWidth > 0;
-        int mapHeight = hasSheet ? (int)(inside.Height * SheetMapShare) : 0;
+        int mapHeight = hasSheet ? MapHeight(Height, gap, LogicalToDeviceUnits(Margin16)) : 0;
         int labelHeight = inside.Height - 2 * line - gap - (hasSheet ? mapHeight + gap : 0);
         if (labelHeight <= 0)
         {
@@ -166,26 +199,32 @@ internal class LabelPreview : Control
 
         // 1. The label (the size of the two fields in the window), as big as fits, in the middle. Objects that stick out
         //    of the label are drawn too, on the pale blue around it: the view is made big enough for them.
+        //    With ShowRotation (settings.json: ShowLabelRotation) the label is turned by its ROTATION plus the turn of the
+        //    sheet map, as it sits on the sheet map below (= as the operator sees it, and as it is printed with
+        //    PrintLabelWithRotation); a quarter turn swaps its length and width on the screen.
         SizeF size = _labelSize;
         List<RectangleF> objects = LabelRenderer.ObjectBounds(label);
         ObjectsOutside = LabelRenderer.CountOutside(objects, size);
         RectangleF view = LabelRenderer.ViewArea(objects, size);
-        float scale = Math.Min(inside.Width / view.Width, labelHeight / view.Height);
-        float viewLeft = inside.Left + (inside.Width - view.Width * scale) / 2;
-        float viewTop = inside.Top + (labelHeight - view.Height * scale) / 2;
-        var paper = new RectangleF(viewLeft - view.X * scale, viewTop - view.Y * scale, size.Width * scale, size.Height * scale);
-
-        using (var white = new SolidBrush(Theme.LabelPaper))
-        using (var border = new Pen(Theme.LightBlue, 1))
-        {
-            g.FillRectangle(white, paper);
-            g.DrawRectangle(border, paper.X, paper.Y, paper.Width, paper.Height);
-        }
+        int turns = _showRotation ? LabelRenderer.QuarterTurnsAsTheOperatorSees(label.Rotation, _sheetRotation, _rotationClockwise) : 0;
+        float viewAcross = turns % 2 == 0 ? view.Width : view.Height;
+        float viewUpDown = turns % 2 == 0 ? view.Height : view.Width;
+        float scale = Math.Min(inside.Width / viewAcross, labelHeight / viewUpDown);
 
         GraphicsState state = g.Save();
-        g.TextRenderingHint = TextRenderingHint.AntiAlias;
-        g.TranslateTransform(paper.X, paper.Y);
+        g.TranslateTransform(inside.Left + inside.Width / 2f, inside.Top + labelHeight / 2f); // the middle of the room
+        g.RotateTransform(-90 * turns); // on the screen Y counts downwards: a negative angle turns counter-clockwise
         g.ScaleTransform(scale, scale); // from here on, one unit is one millimetre on the label
+        g.TranslateTransform(-(view.X + view.Width / 2), -(view.Y + view.Height / 2)); // the middle of the view there
+
+        using (var white = new SolidBrush(Theme.LabelPaper))
+        using (var border = new Pen(Theme.LightBlue, 1 / scale)) // one screen pixel wide
+        {
+            g.FillRectangle(white, 0, 0, size.Width, size.Height);
+            g.DrawRectangle(border, 0, 0, size.Width, size.Height);
+        }
+
+        g.TextRenderingHint = TextRenderingHint.AntiAlias;
         LabelRenderer.Draw(g, label, _baseFolder, _images, Problems);
         g.Restore(state);
 
@@ -289,6 +328,13 @@ internal class LabelPreview : Control
             g.FillEllipse(dotBrush, origin.X - dot / 2, origin.Y - dot / 2, dot, dot);
         }
     }
+
+    /// <summary>
+    /// The height of the sheet map: together with the gap above it and the margin below it, <see cref="SheetMapShare"/> of
+    /// the whole preview (all in pixels).
+    /// </summary>
+    internal static int MapHeight(int previewHeight, int gap, int margin) =>
+        Math.Max(0, (int)(previewHeight * SheetMapShare) - gap - margin);
 
     private static RectangleF Square(PointF centre, float width, float height) =>
         new(centre.X - width / 2, centre.Y - height / 2, width, height);

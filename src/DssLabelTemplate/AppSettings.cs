@@ -53,6 +53,33 @@ internal class AppSettings
     public static bool IsValidSheetRotation(int degrees) => degrees % 90 == 0 && degrees >= -270 && degrees <= 270;
 
     /// <summary>
+    /// True: the preview shows the label turned by its ROTATION (from the csv), as it will sit on the sheet; false: upright,
+    /// as printed (Daan, 2026-10-26). Only the preview; ONLY in settings.json, not in the window.
+    /// </summary>
+    public bool ShowLabelRotation { get; set; }
+
+    /// <summary>
+    /// True: the print is turned by the label's ROTATION (from the csv), around the middle of the label (Daan, 2026-10-26).
+    /// This only works for a SQUARE label (length = width): a turned label of another shape does not fit its paper, so
+    /// the window then asks whether to print it upright. ONLY in settings.json, not in the window.
+    /// </summary>
+    public bool PrintLabelWithRotation { get; set; }
+
+    /// <summary>
+    /// Which way a positive ROTATION of a label (from the csv) turns it on the sheet: "CCW" (counter-clockwise, default) or
+    /// "CW" (clockwise) (Daan, 2026-10-26). Used by ShowLabelRotation and PrintLabelWithRotation; to be checked on the
+    /// machine with a label at 90 or 270. ONLY in settings.json, not in the window. Anything else is "CCW" on loading.
+    /// </summary>
+    public string LabelDirection { get; set; } = CounterClockwise;
+
+    public const string CounterClockwise = "CCW";
+    public const string Clockwise = "CW";
+
+    /// <summary>True when <see cref="LabelDirection"/> is "CW". Not written to settings.json (LabelDirection is).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool LabelRotationIsClockwise => string.Equals(LabelDirection, Clockwise, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// The corner of the sheet the label X / Y in the csv are measured from (Daan, 2026-10-26): DSSClient's own names
     /// "Linksonder", "Linksboven", "Rechtsonder" or "Rechtsboven" (the English names work too, see <see cref="SheetCorners"/>).
     /// Must be the same corner as DSSClient's "Oriëntatie" and TsDssConverter's zero-point drop-down: TsDssConverter
@@ -158,6 +185,9 @@ internal static class SettingsStore
             {
                 settings.SheetRotationInViewer = 0;
             }
+
+            // The label direction edited by hand: "cw" is written back as "CW"; anything else is counter-clockwise.
+            settings.LabelDirection = settings.LabelRotationIsClockwise ? AppSettings.Clockwise : AppSettings.CounterClockwise;
 
             // A corner name edited by hand: written back with DSSClient's name; one that is unknown: the bottom left corner.
             settings.SheetReferenceCorner = SheetCorners.Name(SheetCorners.Parse(settings.SheetReferenceCorner) ?? SheetCorner.BottomLeft);

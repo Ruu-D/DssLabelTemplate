@@ -36,6 +36,8 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 | File description moved into "?" icons (hover or tap) and one divider removed: more height for the editor and preview | Done (1.1.2) |
 | Big label CSV files open about 3 x faster, with a gray "loading" layer that blocks clicks meanwhile; wider arrow and print buttons (counter left, print right) | Done (1.1.2) |
 | Zero-point dot on the sheet map; reference corner (`SheetReferenceCorner` in `settings.json`) matching TsDssConverter / DSSClient | Done (1.1.2 rebuild) |
+| Preview 60 % label / 40 % sheet map; `ShowLabelRotation` and `PrintLabelWithRotation` in `settings.json` (turned preview / turned print of a square label) | Done (1.1.3) |
+| Turned preview and print follow the operator's view (rotation + `SheetRotationInViewer`); `LabelDirection` (`CCW` / `CW`) in `settings.json` | Done (1.1.4) |
 
 Third-party components: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence) and
 [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence).
@@ -56,6 +58,11 @@ its top-left corner.
    `"SheetReferenceCorner": "Linksonder"` in `settings.json` (`Linksonder`, `Linksboven`, `Rechtsonder` or `Rechtsboven`,
    DSSClient's own names; only in the file). It must be the same corner as TsDssConverter's zero-point drop-down
    (= DSSClient's "Oriëntatie"), otherwise the sheet map shows the labels mirrored.
+7. `"ShowLabelRotation": true` in `settings.json` turns the label PREVIEW by the label's rotation from the CSV (the way of
+   `"LabelDirection": "CCW"` or `"CW"`, default CCW) plus `SheetRotationInViewer`, as the operator sees the label on the sheet; `"PrintLabelWithRotation": true`
+   turns the PRINT the same way, around the middle of the label, so the operator can stick it on without turning it. Printing
+   turned only works for a square label (length = width); for other sizes the program asks whether to print upright. Both are
+   off by default and only in the file.
 
 ## Open questions
 

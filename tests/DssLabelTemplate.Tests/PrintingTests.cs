@@ -209,4 +209,87 @@ public class PrintingTests
         Assert.False(LabelPrinter.PaperFits(new SizeF(60, 60), label));
         Assert.False(LabelPrinter.PaperFits(new SizeF(210, 297), label)); // an A4 printer chosen by mistake
     }
+
+    // ---------------------------------------------------------------- PrintLabelWithRotation
+
+    /// <summary>Which quarter of a 60 x 60 mm page has the most ink: "top left", "bottom left", ...</summary>
+    private static string InkedQuarter(int rotation, bool turned, int sheetRotationInViewer = 0, bool clockwise = false)
+    {
+        // A QR code in the top left corner of the label (2 – 18 mm): almost all ink is in that quarter.
+        var printLabel = new XElement("PrintLabel", new XAttribute("ID", "1"), new XAttribute("ROTATION", rotation),
+            new XElement("QRCode", new XAttribute("X", "2"), new XAttribute("Y", "2"), new XAttribute("Width", "16"), new XAttribute("Height", "16"), "ABC"));
+        var label = new LabelItem(printLabel, new XElement("DSSPrintJob"), new LabelVariables(null, DateTime.Now));
+
+        using var picture = new Bitmap((int)(60 * DotsPerMm), (int)(60 * DotsPerMm));
+        picture.SetResolution(203, 203);
+        using (Graphics g = Graphics.FromImage(picture))
+        using (var images = new LabelImages())
+        {
+            g.Clear(Color.White);
+            LabelPrinter.DrawPage(g, PointF.Empty, label, null, images, turned ? new SizeF(60, 60) : null, sheetRotationInViewer, clockwise);
+        }
+
+        int half = picture.Width / 2;
+        var ink = new Dictionary<string, int> { ["top left"] = 0, ["top right"] = 0, ["bottom left"] = 0, ["bottom right"] = 0 };
+        for (int x = 0; x < picture.Width; x += 2)
+        {
+            for (int y = 0; y < picture.Height; y += 2)
+            {
+                if (IsDark(picture, x, y))
+                {
+                    ink[(y < half ? "top " : "bottom ") + (x < half ? "left" : "right")]++;
+                }
+            }
+        }
+
+        return ink.MaxBy(pair => pair.Value).Key;
+    }
+
+    [Theory]
+    [InlineData(0, "top left")]
+    [InlineData(90, "bottom left")]   // counter-clockwise: the top left corner goes down
+    [InlineData(180, "bottom right")]
+    [InlineData(270, "top right")]
+    [InlineData(360, "top left")]
+    [InlineData(1, "top left")]       // no quarter turn (the manual also allows 1): not turned
+    public void WithPrintLabelWithRotation_TheSquareLabelIsTurnedAroundItsMiddle_CounterClockwise(int rotation, string quarter)
+    {
+        Assert.Equal(quarter, InkedQuarter(rotation, turned: true));
+    }
+
+    [Theory]
+    [InlineData(0, -90, "top right")]    // Daan's case: the operator sees the sheet a quarter turned: a quarter turn clockwise
+    [InlineData(0, 270, "top right")]    // the same turn written the other way
+    [InlineData(90, -90, "top left")]    // the two turns cancel out
+    [InlineData(180, 90, "top right")]   // 180 + 90 = 270
+    [InlineData(1, 90, "bottom left")]   // no quarter turn on the sheet: only the operator's view
+    public void WithPrintLabelWithRotation_TheTurnOfTheSheetMapIsAdded_SoTheOperatorNeedNotTurnTheLabel(int rotation, int viewer, string quarter)
+    {
+        Assert.Equal(quarter, InkedQuarter(rotation, turned: true, viewer));
+    }
+
+    [Theory]
+    [InlineData(90, 0, "top right")]      // clockwise: the top left corner goes right
+    [InlineData(270, 0, "bottom left")]
+    [InlineData(180, 0, "bottom right")]  // half a turn is the same both ways
+    [InlineData(0, -90, "top right")]     // ROTATION 0 does not depend on the direction: only the operator's view
+    [InlineData(90, -90, "bottom right")] // a quarter clockwise twice = half a turn
+    public void WithLabelDirectionCW_APositiveRotationTurnsClockwise_TheSheetMapTurnStaysCounterClockwise(int rotation, int viewer, string quarter)
+    {
+        Assert.Equal(quarter, InkedQuarter(rotation, turned: true, viewer, clockwise: true));
+    }
+
+    [Fact]
+    public void WithoutPrintLabelWithRotation_TheLabelIsPrintedUpright()
+    {
+        Assert.Equal("top left", InkedQuarter(180, turned: false));
+        Assert.Equal("top left", InkedQuarter(0, turned: false, sheetRotationInViewer: -90)); // also with a turned sheet map
+    }
+
+    [Fact]
+    public void OnlyASquareLabel_CanBePrintedTurned()
+    {
+        Assert.True(LabelPrinter.IsSquare(new SizeF(60, 60)));
+        Assert.False(LabelPrinter.IsSquare(new SizeF(80, 50)));
+    }
 }

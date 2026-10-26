@@ -256,6 +256,15 @@ internal static class Strings
         $"The paper of printer {printer} is {paperLength} × {paperWidth} mm, the label is {labelLength} × {labelWidth} mm. " +
         "Set the paper size of the printer (Windows settings) or change the label size.\n\nPrint anyway?");
 
+    /// <summary>Before printing: PrintLabelWithRotation is on in settings.json, but the label is not square.</summary>
+    public static string RotationNeedsSquareLabelQuestion(string labelLength, string labelWidth) => T(
+        $"Het label is {labelLength} × {labelWidth} mm. Gedraaid afdrukken (PrintLabelWithRotation in settings.json) kan " +
+        "alleen bij een vierkant label: een gedraaid label past niet meer op zijn papier.\n\nRechtop afdrukken, zonder draaiing?",
+        $"L'étiquette mesure {labelLength} × {labelWidth} mm. L'impression tournée (PrintLabelWithRotation dans settings.json) " +
+        "n'est possible qu'avec une étiquette carrée : une étiquette tournée ne tient plus sur son papier.\n\nImprimer droite, sans rotation ?",
+        $"The label is {labelLength} × {labelWidth} mm. Printing turned (PrintLabelWithRotation in settings.json) only works " +
+        "with a square label: a turned label no longer fits its paper.\n\nPrint upright, without rotation?");
+
     public static string CannotPrint(string reason) => T(
         $"Er kon niet worden afgedrukt: {reason}",
         $"L'impression a échoué : {reason}",

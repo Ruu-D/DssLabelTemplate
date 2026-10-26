@@ -89,6 +89,15 @@ public class SheetMapTests
     }
 
     [Theory]
+    [InlineData(900, 8, 16)]
+    [InlineData(1350, 12, 24)] // the same at 150%
+    public void TheSheetMap_WithTheRoomAboveAndBelowIt_Gets40PercentOfThePreview(int height, int gap, int margin)
+    {
+        int map = LabelPreview.MapHeight(height, gap, margin);
+        Assert.InRange((gap + map + margin) / (double)height, 0.399, 0.401);
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(90)]
     [InlineData(180)]

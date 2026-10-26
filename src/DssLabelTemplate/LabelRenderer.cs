@@ -68,6 +68,28 @@ internal static class LabelRenderer
     }
 
     /// <summary>
+    /// The quarter turns counter-clockwise (0 – 3) for the ROTATION of a label: 90 = 1, 180 = 2, 270 = 3, 360 = 0, -90 = 3.
+    /// With <paramref name="clockwise"/> (settings.json: "LabelDirection": "CW") a positive ROTATION turns the other way:
+    /// 90 = 3, 270 = 1. A value that is no multiple of 90 (the manual also allows 1) is 0: the label is not turned.
+    /// </summary>
+    public static int RotationQuarterTurns(int rotation, bool clockwise = false)
+    {
+        int turns = rotation % 90 != 0 ? 0 : ((rotation / 90) % 4 + 4) % 4;
+        return clockwise ? (4 - turns) % 4 : turns;
+    }
+
+    /// <summary>
+    /// The quarter turns counter-clockwise (0 – 3) of a label AS THE OPERATOR SEES IT (Daan, 2026-10-26): its ROTATION on
+    /// the sheet (ROTATION 0 = upright on the sheet: the bottom of the label towards the Y = 0 edge; turned the way of
+    /// <paramref name="clockwise"/>) plus the turn of the sheet map (<see cref="AppSettings.SheetRotationInViewer"/>,
+    /// always counter-clockwise), which turns the sheet to how the operator sees it. Used for the turned preview and the
+    /// turned print, so the operator can take the printed label and stick it on the sheet without turning it.
+    /// Example: ROTATION 0 with SheetRotationInViewer -90 = 3 (a quarter turn clockwise).
+    /// </summary>
+    public static int QuarterTurnsAsTheOperatorSees(int rotation, int sheetRotationInViewer, bool clockwise = false) =>
+        (RotationQuarterTurns(rotation, clockwise) + LabelPreview.QuarterTurns(sheetRotationInViewer)) % 4;
+
+    /// <summary>
     /// Draws every print object. An object with a missing or wrong number is skipped and named in <paramref name="problems"/>.
     /// Unknown objects are skipped silently (they may be new in DSS).
     /// </summary>

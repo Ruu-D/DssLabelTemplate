@@ -111,6 +111,56 @@ public class SettingsTests
     }
 
     [Fact]
+    public void TheTwoRotationSettings_AreOffByDefault_AndSavedAndLoaded()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        File.WriteAllText(path, "{ \"Language\": \"en\" }"); // a settings.json of before
+        Assert.False(SettingsStore.Load(path).ShowLabelRotation);
+        Assert.False(SettingsStore.Load(path).PrintLabelWithRotation);
+
+        SettingsStore.Save(path, new AppSettings { ShowLabelRotation = true, PrintLabelWithRotation = true });
+
+        string text = File.ReadAllText(path);
+        Assert.Contains("\"ShowLabelRotation\": true", text); // the names a person edits by hand
+        Assert.Contains("\"PrintLabelWithRotation\": true", text);
+        Assert.True(SettingsStore.Load(path).ShowLabelRotation);
+        Assert.True(SettingsStore.Load(path).PrintLabelWithRotation);
+    }
+
+    [Theory]
+    [InlineData(null, "CCW", false)]   // a settings.json of before: counter-clockwise
+    [InlineData("CW", "CW", true)]
+    [InlineData("cw", "CW", true)]
+    [InlineData("CCW", "CCW", false)]
+    [InlineData("left", "CCW", false)] // unknown: counter-clockwise
+    public void TheLabelDirection_IsCCWByDefault_AndCWWhenWritten(string? written, string loaded, bool clockwise)
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        File.WriteAllText(path, written == null ? "{ \"Language\": \"en\" }" : "{ \"LabelDirection\": \"" + written + "\" }");
+
+        AppSettings settings = SettingsStore.Load(path);
+        Assert.Equal(loaded, settings.LabelDirection);
+        Assert.Equal(clockwise, settings.LabelRotationIsClockwise);
+    }
+
+    [Fact]
+    public void TheLabelDirection_IsSavedByItsName_AndTheHelperIsNotWritten()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        SettingsStore.Save(path, new AppSettings { LabelDirection = "CW" });
+
+        string text = File.ReadAllText(path);
+        Assert.Contains("\"LabelDirection\": \"CW\"", text);
+        Assert.DoesNotContain("LabelRotationIsClockwise", text);
+    }
+
+    [Fact]
     public void TheReferenceCorner_IsSavedAndLoaded_WithDSSClientsName()
     {
         using var folder = new TempFolder();
