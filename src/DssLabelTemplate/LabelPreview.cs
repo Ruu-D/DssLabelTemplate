@@ -19,6 +19,7 @@ internal class LabelPreview : Control
     private string? _baseFolder;
     private int _index;
     private SizeF _labelSize = new((float)AppSettings.DefaultLabelSize, (float)AppSettings.DefaultLabelSize);
+    private int _sheetRotation;
 
     public LabelPreview()
     {
@@ -47,6 +48,22 @@ internal class LabelPreview : Control
         set
         {
             _labelSize = value;
+            Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// How far the sheet map is turned, in degrees counter-clockwise (<see cref="AppSettings.SheetRotationInViewer"/>):
+    /// 0, 90, 180, 270 or the negative ones. Only the sheet map turns; the label itself stays upright (as printed).
+    /// </summary>
+    [System.ComponentModel.Browsable(false)]
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public int SheetRotation
+    {
+        get => _sheetRotation;
+        set
+        {
+            _sheetRotation = value;
             Invalidate();
         }
     }
@@ -189,12 +206,20 @@ internal class LabelPreview : Control
     /// The sheet seen from above, with a small square for every label and the shown label in the brand colour. X along the
     /// length, Y along the width, from the bottom left corner (TopSolid's corner; the real reference corner is a setting in
     /// DSSClient). X, Y is the middle of the label (Duivestein's description of the label-csv).
+    /// The whole map (sheet and labels) is turned by <see cref="SheetRotation"/>, so it matches how the operator sees the
+    /// sheet from the label PC.
     /// </summary>
     private void DrawSheetMap(Graphics g, Rectangle area, LabelItem shown, SizeF labelSize)
     {
         float length = (float)shown.SheetLength!.Value, width = (float)shown.SheetWidth!.Value;
-        float scale = Math.Min(area.Width / length, area.Height / width);
-        var sheet = new RectangleF(area.Left + (area.Width - length * scale) / 2, area.Top + (area.Height - width * scale) / 2, length * scale, width * scale);
+        int turns = QuarterTurns(_sheetRotation);
+        float scale = MapScale(area, length, width, turns);
+
+        // Two opposite corners of the sheet, wherever the turn puts them.
+        PointF corner1 = MapPoint(area, length, width, turns, 0, 0);
+        PointF corner2 = MapPoint(area, length, width, turns, length, width);
+        RectangleF sheet = RectangleF.FromLTRB(Math.Min(corner1.X, corner2.X), Math.Min(corner1.Y, corner2.Y),
+            Math.Max(corner1.X, corner2.X), Math.Max(corner1.Y, corner2.Y));
 
         using (var white = new SolidBrush(Theme.White))
         using (var border = new Pen(Theme.LightBlue, 1))
@@ -203,8 +228,11 @@ internal class LabelPreview : Control
             g.DrawRectangle(border, sheet.X, sheet.Y, sheet.Width, sheet.Height);
         }
 
+        // A quarter turn also turns the labels: their length then runs up and down the map.
+        float labelAcross = turns % 2 == 0 ? labelSize.Width : labelSize.Height;
+        float labelUpDown = turns % 2 == 0 ? labelSize.Height : labelSize.Width;
         float minimum = LogicalToDeviceUnits(4);
-        float squareWidth = Math.Max(minimum, labelSize.Width * scale), squareHeight = Math.Max(minimum, labelSize.Height * scale);
+        float squareWidth = Math.Max(minimum, labelAcross * scale), squareHeight = Math.Max(minimum, labelUpDown * scale);
         using var others = new SolidBrush(Theme.PaleBlue);
         using var current = new SolidBrush(Theme.Brand);
         using var outline = new Pen(Theme.Navy, 1);
@@ -217,22 +245,48 @@ internal class LabelPreview : Control
                 continue;
             }
 
-            g.FillRectangle(others, Square(sheet, scale, x, y, squareWidth, squareHeight));
+            g.FillRectangle(others, Square(MapPoint(area, length, width, turns, x, y), squareWidth, squareHeight));
         }
 
         if (shown.X is double shownX && shown.Y is double shownY)
         {
-            RectangleF square = Square(sheet, scale, shownX, shownY, squareWidth, squareHeight);
+            RectangleF square = Square(MapPoint(area, length, width, turns, shownX, shownY), squareWidth, squareHeight);
             g.FillRectangle(current, square);
             g.DrawRectangle(outline, square.X, square.Y, square.Width, square.Height);
         }
     }
 
-    private static RectangleF Square(RectangleF sheet, float scale, double x, double y, float width, float height)
+    private static RectangleF Square(PointF centre, float width, float height) =>
+        new(centre.X - width / 2, centre.Y - height / 2, width, height);
+
+    /// <summary>The number of quarter turns counter-clockwise (0 – 3) for a rotation in degrees: -90 = 3, 180 = 2, 360 = 0.</summary>
+    internal static int QuarterTurns(int degrees) => ((degrees / 90) % 4 + 4) % 4;
+
+    /// <summary>Screen pixels per mm of the sheet: as big as fits in the area, with the sheet turned by <paramref name="turns"/>.</summary>
+    internal static float MapScale(RectangleF area, float length, float width, int turns) =>
+        turns % 2 == 0
+            ? Math.Min(area.Width / length, area.Height / width)
+            : Math.Min(area.Width / width, area.Height / length); // a quarter turn: the length runs up and down
+
+    /// <summary>
+    /// Where a point of the sheet (mm, X along the length, Y upwards from the bottom left corner) lands in the map: the
+    /// sheet in the middle of the area, as big as fits, turned <paramref name="turns"/> quarter turns counter-clockwise.
+    /// </summary>
+    internal static PointF MapPoint(RectangleF area, float length, float width, int turns, double x, double y)
     {
-        float centreX = sheet.Left + (float)x * scale;
-        float centreY = sheet.Bottom - (float)y * scale; // Y counts upwards from the bottom edge
-        return new RectangleF(centreX - width / 2, centreY - height / 2, width, height);
+        float scale = MapScale(area, length, width, turns);
+
+        // From the middle of the sheet, Y still upwards.
+        float dx = (float)x - length / 2, dy = (float)y - width / 2;
+
+        // Turn counter-clockwise, a quarter at a time: (dx, dy) becomes (-dy, dx).
+        for (int i = 0; i < turns; i++)
+        {
+            (dx, dy) = (-dy, dx);
+        }
+
+        float middleX = area.Left + area.Width / 2, middleY = area.Top + area.Height / 2;
+        return new PointF(middleX + dx * scale, middleY - dy * scale); // on the screen Y counts downwards
     }
 
     private void DrawMessage(Graphics g, Rectangle area, string text, Color color)

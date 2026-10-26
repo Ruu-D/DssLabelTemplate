@@ -83,6 +83,34 @@ public class SettingsTests
     }
 
     [Fact]
+    public void TheSheetRotation_IsSavedAndLoaded_AlsoNegative()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        SettingsStore.Save(path, new AppSettings { SheetRotationInViewer = -90 });
+
+        Assert.Contains("\"SheetRotationInViewer\": -90", File.ReadAllText(path)); // the name a person edits by hand
+        Assert.Equal(-90, SettingsStore.Load(path).SheetRotationInViewer);
+    }
+
+    [Fact]
+    public void ASheetRotationThatIsNoQuarterTurn_IsBackTo0()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        foreach (int degrees in new[] { 45, 360, -450 })
+        {
+            File.WriteAllText(path, "{ \"SheetRotationInViewer\": " + degrees + " }");
+            Assert.Equal(0, SettingsStore.Load(path).SheetRotationInViewer);
+        }
+
+        File.WriteAllText(path, "{ \"Language\": \"en\" }"); // a settings.json of version 1.1.1
+        Assert.Equal(0, SettingsStore.Load(path).SheetRotationInViewer);
+    }
+
+    [Fact]
     public void ASettingsFileWithoutALabelSize_Gives100By100()
     {
         using var folder = new TempFolder();

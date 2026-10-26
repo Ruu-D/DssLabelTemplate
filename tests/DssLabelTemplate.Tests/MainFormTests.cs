@@ -261,6 +261,16 @@ public class MainFormTests
     }
 
     [Fact]
+    public void TheSheetRotationOfSettingsJson_TurnsTheSheetMap()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window(new AppSettings { SheetRotationInViewer = 270 });
+            Assert.Equal(270, window.Form.Preview.SheetRotation);
+        });
+    }
+
+    [Fact]
     public void TheColumnShareOfTheLastTime_IsUsedAtTheStart_WithinTheMinimumWidths()
     {
         Sta.Run(() =>

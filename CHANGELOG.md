@@ -1,5 +1,15 @@
 # Changelog
 
+## Not released yet — 2026-10-26
+
+- **The sheet map can be turned:** a new setting `SheetRotationInViewer` in `settings.json` ONLY (not in the window,
+  Daan's request): 0, 90, 180, 270 or -90, -180, -270 degrees, counter-clockwise (a negative value = clockwise). The
+  label PC sits on a console that can be turned, so the operator may see the sheet on the machine from another side than
+  along its length. Only the sheet map under the label turns (the sheet and all its labels); the label itself stays upright.
+  Any other value (45, 360, …) becomes 0. Not in the file yet = 0, and the program writes it the next time it saves its
+  settings (e.g. when it is closed).
+- 160 tests (sheet-map geometry, the setting). Rendered at 0°, 90° and -90° with Daan's sample (sheet 2850 x 2100).
+
 ## 1.1.1 — 2026-10-25 (after Daan's test of 1.1.0)
 
 - **The window's place is remembered:** position, size (stored at 100%, so it fits a monitor with another scaling) and

@@ -43,6 +43,16 @@ internal class AppSettings
     public static bool IsValidEditorColumnShare(double share) => share >= MinimumEditorColumnShare && share <= MaximumEditorColumnShare;
 
     /// <summary>
+    /// How far the sheet map below the label is turned, in degrees counter-clockwise (Daan, 2026-10-26): 0, 90, 180, 270
+    /// or -90, -180, -270 (= clockwise). The label PC sits on a console that can be turned, so the operator may look at the
+    /// sheet on the machine from another side than along its length. ONLY in settings.json, not in the window. Write the
+    /// number without a plus sign ("90", not "+90": that is not valid json and the whole file would give the defaults).
+    /// </summary>
+    public int SheetRotationInViewer { get; set; }
+
+    public static bool IsValidSheetRotation(int degrees) => degrees % 90 == 0 && degrees >= -270 && degrees <= 270;
+
+    /// <summary>
     /// Where the window was when the program was closed last time (Daan, 2026-10-25), used again at the next start:
     /// the top left corner in screen pixels, the size at 100% (so it fits a monitor with another scaling too), and whether
     /// it was maximised. When maximised, the place and size are those of the normal window (to go back to).
@@ -93,6 +103,12 @@ internal static class SettingsStore
             if (!AppSettings.IsValidEditorColumnShare(settings.EditorColumnShare))
             {
                 settings.EditorColumnShare = AppSettings.DefaultEditorColumnShare;
+            }
+
+            // A sheet rotation edited by hand into something that is not a quarter turn (e.g. 45): the sheet straight again.
+            if (!AppSettings.IsValidSheetRotation(settings.SheetRotationInViewer))
+            {
+                settings.SheetRotationInViewer = 0;
             }
 
             // A size edited by hand into something impossible: back to 100 mm.

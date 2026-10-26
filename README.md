@@ -32,6 +32,7 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 | **First release** | **1.0.0** |
 | Print button (reprint on a Zebra ZD220), real QR codes, draggable column divider, new banner text, touch-friendly layout | 1.1.0, customer test version; waiting for a test on the real printer |
 | Window size / position / maximised and column divider remembered; label CSV shown as a table first | Done (1.1.1, published) |
+| Sheet map can be turned (`SheetRotationInViewer` in `settings.json`), for a label PC on a turnable console | Done (not released yet) |
 
 Third-party components: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence) and
 [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence).
@@ -45,6 +46,9 @@ its top-left corner.
    Code 39, … are not built in).
 4. The printer's paper size is set in the printer driver (Windows settings) to the label size; the program warns when
    it does not match the label size in the window.
+5. The small sheet map below the label can be turned to match how the operator sees the sheet on the machine:
+   `"SheetRotationInViewer": 90` in `settings.json` (0, 90, 180, 270 or the negative ones; positive = counter-clockwise).
+   This setting is only in the file, not in the window.
 
 ## Open questions
 
