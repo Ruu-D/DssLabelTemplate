@@ -64,6 +64,31 @@ public class SheetMapTests
     }
 
     [Theory]
+    [InlineData(SheetCorner.BottomLeft, 399, 540)]
+    [InlineData(SheetCorner.BottomRight, 2451, 540)]
+    [InlineData(SheetCorner.TopLeft, 399, 1560)]
+    [InlineData(SheetCorner.TopRight, 2451, 1560)]
+    public void ThePositionOfTheCsv_MeasuredFromItsCorner_LandsOnTheSameSpotOfTheSheet(SheetCorner corner, double x, double y)
+    {
+        // K1 - Front - 3575 of the sample: TopSolid says X 399, Y 540 from the bottom left; TsDssConverter writes the csv
+        // measured from the corner of its drop-down. Every corner must give the same spot on the map.
+        Assert.Equal((399.0, 540.0), LabelPreview.ToBottomLeft(corner, Length, Width, x, y));
+    }
+
+    [Theory]
+    [InlineData(SheetCorner.BottomLeft, false, false)]
+    [InlineData(SheetCorner.BottomRight, true, false)]
+    [InlineData(SheetCorner.TopLeft, false, true)]
+    [InlineData(SheetCorner.TopRight, true, true)]
+    public void TheZeroPoint_IsOnTheChosenCornerOfTheSheet(SheetCorner corner, bool right, bool top)
+    {
+        var (x, y) = LabelPreview.ToBottomLeft(corner, Length, Width, 0, 0);
+        PointF point = LabelPreview.MapPoint(Area, Length, Width, 0, x, y);
+        Assert.Equal(right, point.X > Area.Width / 2);
+        Assert.Equal(top, point.Y < Area.Height / 2); // on the screen Y counts downwards
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(90)]
     [InlineData(180)]

@@ -1,5 +1,21 @@
 # Changelog
 
+## Not released yet (2026-10-26, Daan)
+
+- **Zero-point dot on the sheet map:** a round navy dot with a thin white ring on the corner the label X / Y are measured
+  from, the same look as TsDssConverter's corner schematic. Drawn last (a label in that corner does not hide it); it turns
+  with `SheetRotationInViewer`.
+- **The reference corner is a setting:** `SheetReferenceCorner` in `settings.json` ONLY (not in the window), DSSClient's
+  own names `Linksonder` (default) / `Linksboven` / `Rechtsonder` / `Rechtsboven`; the English names (`TopRight`,
+  `Top-right`, …, any case) are understood too and written back with DSSClient's name; anything else becomes
+  `Linksonder`. It must be the same corner as TsDssConverter's zero-point drop-down (= DSSClient's "Oriëntatie"):
+  TsDssConverter converts TopSolid's bottom-left positions to that corner, so before this the sheet map showed the labels
+  mirrored for any corner other than Linksonder. The map converts every position back (`LabelPreview.ToBottomLeft`) and
+  puts the dot on that corner. Rendered at a real 150% with a csv converted to Rechtsboven: the same map as Linksonder
+  with the original csv, only the dot moved.
+- 181 tests (was 165): every corner gives the same spot for the sample part (X 399 / Y 540 from the bottom left), the dot's
+  corner, the setting saved / loaded / understood / repaired.
+
 ## 1.1.2 — 2026-10-26 (after Daan's test of 1.1.1)
 
 - **The sheet map can be turned:** a new setting `SheetRotationInViewer` in `settings.json` ONLY (not in the window,

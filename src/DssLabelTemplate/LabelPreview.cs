@@ -13,6 +13,8 @@ internal class LabelPreview : Control
     private const int Margin16 = 16;   // room around everything, at 100%
     private const int Gap = 8;         // between the parts, at 100%
     private const float SheetMapShare = 0.25f; // the sheet map gets this part of the height
+    private const int OriginDot = 9;   // the round zero-point dot on the sheet map, at 100%
+    private const int OriginRing = 2;  // white ring around that dot, at 100%
 
     private readonly LabelImages _images = new();
     private LabelSet? _labels;
@@ -20,6 +22,7 @@ internal class LabelPreview : Control
     private int _index;
     private SizeF _labelSize = new((float)AppSettings.DefaultLabelSize, (float)AppSettings.DefaultLabelSize);
     private int _sheetRotation;
+    private SheetCorner _referenceCorner = SheetCorner.BottomLeft;
 
     public LabelPreview()
     {
@@ -64,6 +67,22 @@ internal class LabelPreview : Control
         set
         {
             _sheetRotation = value;
+            Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// The corner of the sheet the label X / Y in the csv are measured from (<see cref="AppSettings.SheetReferenceCorner"/>).
+    /// The sheet map puts the labels and the zero-point dot accordingly.
+    /// </summary>
+    [System.ComponentModel.Browsable(false)]
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public SheetCorner ReferenceCorner
+    {
+        get => _referenceCorner;
+        set
+        {
+            _referenceCorner = value;
             Invalidate();
         }
     }
@@ -204,8 +223,8 @@ internal class LabelPreview : Control
 
     /// <summary>
     /// The sheet seen from above, with a small square for every label and the shown label in the brand colour. X along the
-    /// length, Y along the width, from the bottom left corner (TopSolid's corner; the real reference corner is a setting in
-    /// DSSClient). X, Y is the middle of the label (Duivestein's description of the label-csv).
+    /// length, Y along the width, measured from <see cref="ReferenceCorner"/> (DSSClient's corner, marked with a round dot).
+    /// X, Y is the middle of the label (Duivestein's description of the label-csv).
     /// The whole map (sheet and labels) is turned by <see cref="SheetRotation"/>, so it matches how the operator sees the
     /// sheet from the label PC.
     /// </summary>
@@ -245,19 +264,46 @@ internal class LabelPreview : Control
                 continue;
             }
 
-            g.FillRectangle(others, Square(MapPoint(area, length, width, turns, x, y), squareWidth, squareHeight));
+            var (fromLeft, fromBottom) = ToBottomLeft(_referenceCorner, length, width, x, y);
+            g.FillRectangle(others, Square(MapPoint(area, length, width, turns, fromLeft, fromBottom), squareWidth, squareHeight));
         }
 
         if (shown.X is double shownX && shown.Y is double shownY)
         {
-            RectangleF square = Square(MapPoint(area, length, width, turns, shownX, shownY), squareWidth, squareHeight);
+            var (fromLeft, fromBottom) = ToBottomLeft(_referenceCorner, length, width, shownX, shownY);
+            RectangleF square = Square(MapPoint(area, length, width, turns, fromLeft, fromBottom), squareWidth, squareHeight);
             g.FillRectangle(current, square);
             g.DrawRectangle(outline, square.X, square.Y, square.Width, square.Height);
+        }
+
+        // A round dot on the zero point (X 0, Y 0): the corner the label X / Y are measured from. Drawn last, so a label in
+        // that corner does not hide it; it turns with the map. Navy with a white ring, as in TsDssConverter's corner schematic.
+        var (originX, originY) = ToBottomLeft(_referenceCorner, length, width, 0, 0);
+        PointF origin = MapPoint(area, length, width, turns, originX, originY);
+        float dot = LogicalToDeviceUnits(OriginDot);
+        float ring = LogicalToDeviceUnits(OriginDot + 2 * OriginRing);
+        using (var ringBrush = new SolidBrush(Theme.White))
+        using (var dotBrush = new SolidBrush(Theme.Navy))
+        {
+            g.FillEllipse(ringBrush, origin.X - ring / 2, origin.Y - ring / 2, ring, ring);
+            g.FillEllipse(dotBrush, origin.X - dot / 2, origin.Y - dot / 2, dot, dot);
         }
     }
 
     private static RectangleF Square(PointF centre, float width, float height) =>
         new(centre.X - width / 2, centre.Y - height / 2, width, height);
+
+    /// <summary>
+    /// A position measured from <paramref name="corner"/> (as in the csv), measured from the bottom left corner instead (as
+    /// <see cref="MapPoint"/> wants it). From the right: X counts from the other end of the length; from the top: Y from the
+    /// other side of the width. Example, a sheet of 2850 x 2100 and the corner Rechtsboven: X 2451, Y 1560 = X 399, Y 540.
+    /// </summary>
+    internal static (double X, double Y) ToBottomLeft(SheetCorner corner, double length, double width, double x, double y)
+    {
+        bool fromRight = corner is SheetCorner.BottomRight or SheetCorner.TopRight;
+        bool fromTop = corner is SheetCorner.TopLeft or SheetCorner.TopRight;
+        return (fromRight ? length - x : x, fromTop ? width - y : y);
+    }
 
     /// <summary>The number of quarter turns counter-clockwise (0 – 3) for a rotation in degrees: -90 = 3, 180 = 2, 360 = 0.</summary>
     internal static int QuarterTurns(int degrees) => ((degrees / 90) % 4 + 4) % 4;

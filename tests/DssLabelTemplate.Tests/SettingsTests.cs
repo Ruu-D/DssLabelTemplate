@@ -111,6 +111,48 @@ public class SettingsTests
     }
 
     [Fact]
+    public void TheReferenceCorner_IsSavedAndLoaded_WithDSSClientsName()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        SettingsStore.Save(path, new AppSettings { SheetReferenceCorner = "Rechtsboven" });
+
+        Assert.Contains("\"SheetReferenceCorner\": \"Rechtsboven\"", File.ReadAllText(path)); // the name a person edits by hand
+        Assert.Equal("Rechtsboven", SettingsStore.Load(path).SheetReferenceCorner);
+    }
+
+    [Theory]
+    [InlineData("TopRight", "Rechtsboven")]
+    [InlineData(" top-left ", "Linksboven")]
+    [InlineData("rechtsonder", "Rechtsonder")]
+    [InlineData("Bottom-left", "Linksonder")]
+    [InlineData("Midden", "Linksonder")]   // unknown: the bottom left corner
+    [InlineData("", "Linksonder")]
+    public void AReferenceCornerEditedByHand_IsUnderstood_OrBackToLinksonder(string written, string loaded)
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        File.WriteAllText(path, "{ \"SheetReferenceCorner\": \"" + written + "\" }");
+
+        Assert.Equal(loaded, SettingsStore.Load(path).SheetReferenceCorner);
+    }
+
+    [Fact]
+    public void ASettingsFileWithoutAReferenceCorner_GivesLinksonder()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        File.WriteAllText(path, "{ \"Language\": \"en\" }"); // a settings.json of version 1.1.2
+        Assert.Equal("Linksonder", SettingsStore.Load(path).SheetReferenceCorner);
+
+        File.WriteAllText(path, "{ \"SheetReferenceCorner\": null }");
+        Assert.Equal("Linksonder", SettingsStore.Load(path).SheetReferenceCorner);
+    }
+
+    [Fact]
     public void ASettingsFileWithoutALabelSize_Gives100By100()
     {
         using var folder = new TempFolder();

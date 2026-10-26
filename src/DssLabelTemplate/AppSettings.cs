@@ -53,6 +53,15 @@ internal class AppSettings
     public static bool IsValidSheetRotation(int degrees) => degrees % 90 == 0 && degrees >= -270 && degrees <= 270;
 
     /// <summary>
+    /// The corner of the sheet the label X / Y in the csv are measured from (Daan, 2026-10-26): DSSClient's own names
+    /// "Linksonder", "Linksboven", "Rechtsonder" or "Rechtsboven" (the English names work too, see <see cref="SheetCorners"/>).
+    /// Must be the same corner as DSSClient's "Oriëntatie" and TsDssConverter's zero-point drop-down: TsDssConverter
+    /// converts TopSolid's bottom-left positions to that corner, so with another corner here the sheet map would show the
+    /// labels mirrored. ONLY in settings.json, not in the window. Anything else is "Linksonder" on loading.
+    /// </summary>
+    public string SheetReferenceCorner { get; set; } = SheetCorners.Name(SheetCorner.BottomLeft);
+
+    /// <summary>
     /// Where the window was when the program was closed last time (Daan, 2026-10-25), used again at the next start:
     /// the top left corner in screen pixels, the size at 100% (so it fits a monitor with another scaling too), and whether
     /// it was maximised. When maximised, the place and size are those of the normal window (to go back to).
@@ -63,6 +72,45 @@ internal class AppSettings
     public int WindowWidth { get; set; }
     public int WindowHeight { get; set; }
     public bool WindowMaximized { get; set; }
+}
+
+/// <summary>The four corners of a sheet that the label X / Y can be measured from (<see cref="AppSettings.SheetReferenceCorner"/>).</summary>
+public enum SheetCorner
+{
+    BottomLeft,
+    TopLeft,
+    BottomRight,
+    TopRight,
+}
+
+/// <summary>The names of the <see cref="SheetCorner"/>s in settings.json.</summary>
+internal static class SheetCorners
+{
+    // DSSClient's own (Dutch) name first: that is the one written to settings.json. The others are also understood.
+    private static readonly (SheetCorner Corner, string[] Names)[] KnownNames =
+    {
+        (SheetCorner.BottomLeft, new[] { "Linksonder", "BottomLeft", "Bottom-left" }),
+        (SheetCorner.TopLeft, new[] { "Linksboven", "TopLeft", "Top-left" }),
+        (SheetCorner.BottomRight, new[] { "Rechtsonder", "BottomRight", "Bottom-right" }),
+        (SheetCorner.TopRight, new[] { "Rechtsboven", "TopRight", "Top-right" }),
+    };
+
+    /// <summary>The corner with this name (any case, spaces around it allowed), or null when the name is unknown.</summary>
+    public static SheetCorner? Parse(string? name)
+    {
+        foreach (var (corner, names) in KnownNames)
+        {
+            if (names.Any(known => string.Equals(known, name?.Trim(), StringComparison.OrdinalIgnoreCase)))
+            {
+                return corner;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>DSSClient's name of the corner, as written to settings.json.</summary>
+    public static string Name(SheetCorner corner) => KnownNames.First(known => known.Corner == corner).Names[0];
 }
 
 /// <summary>Reads and writes settings.json. Never throws on reading: a missing or broken file gives the defaults.</summary>
@@ -110,6 +158,9 @@ internal static class SettingsStore
             {
                 settings.SheetRotationInViewer = 0;
             }
+
+            // A corner name edited by hand: written back with DSSClient's name; one that is unknown: the bottom left corner.
+            settings.SheetReferenceCorner = SheetCorners.Name(SheetCorners.Parse(settings.SheetReferenceCorner) ?? SheetCorner.BottomLeft);
 
             // A size edited by hand into something impossible: back to 100 mm.
             if (!AppSettings.IsValidLabelSize(settings.LabelLength))

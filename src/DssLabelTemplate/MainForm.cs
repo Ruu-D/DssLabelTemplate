@@ -186,6 +186,7 @@ internal class MainForm : Form
         LabelWidthBox.Text = LabelXml.Format(_settings.LabelWidth);
         Preview.LabelSize = new SizeF((float)_settings.LabelLength, (float)_settings.LabelWidth);
         Preview.SheetRotation = _settings.SheetRotationInViewer; // only in settings.json, not in the window
+        Preview.ReferenceCorner = SheetCorners.Parse(_settings.SheetReferenceCorner) ?? SheetCorner.BottomLeft; // the same
         LabelLengthBox.TextChanged += (sender, e) => OnLabelSizeChanged(LabelLengthBox);
         LabelWidthBox.TextChanged += (sender, e) => OnLabelSizeChanged(LabelWidthBox);
 
