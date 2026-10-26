@@ -1,6 +1,12 @@
 # Changelog
 
-## Not released yet (2026-10-26, Daan)
+## 1.1.2 rebuild — 2026-10-26 (same version number, Daan)
+
+- **Delivery:** `dist\v1.1.2\DssLabelTemplate.exe`, 53,209,204 bytes, file version 1.1.2.0, SHA-256
+  `7c3f1718290ae538c70c007a573e876e3c5dea5e118d3bf5293a4200bf36510d`. Built by `publish.cmd` after all 181 tests passed;
+  the exe itself was not started. Rebuilt under the SAME number on Daan's request, so two different exes say 1.1.2: tell
+  them apart by this checksum. The first 1.1.2 build (`4ea7e7fb...`) was copied to `dist\_previous-builds\2026-10-26\v1.1.2\`
+  first (publish.cmd empties `dist\v1.1.2`).
 
 - **Zero-point dot on the sheet map:** a round navy dot with a thin white ring on the corner the label X / Y are measured
   from, the same look as TsDssConverter's corner schematic. Drawn last (a label in that corner does not hide it); it turns

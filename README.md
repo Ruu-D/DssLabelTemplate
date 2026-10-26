@@ -35,7 +35,7 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 | Sheet map can be turned (`SheetRotationInViewer` in `settings.json`), for a label PC on a turnable console | Done (1.1.2) |
 | File description moved into "?" icons (hover or tap) and one divider removed: more height for the editor and preview | Done (1.1.2) |
 | Big label CSV files open about 3 x faster, with a gray "loading" layer that blocks clicks meanwhile; wider arrow and print buttons (counter left, print right) | Done (1.1.2) |
-| Zero-point dot on the sheet map; reference corner (`SheetReferenceCorner` in `settings.json`) matching TsDssConverter / DSSClient | Done (not released yet) |
+| Zero-point dot on the sheet map; reference corner (`SheetReferenceCorner` in `settings.json`) matching TsDssConverter / DSSClient | Done (1.1.2 rebuild) |
 
 Third-party components: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence) and
 [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence).
