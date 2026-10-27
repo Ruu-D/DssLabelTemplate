@@ -312,6 +312,24 @@ public class MainFormTests
     }
 
     [Fact]
+    public void ThePrintButtonsText_SaysWhetherADialogFollows()
+    {
+        // (The print button itself is never pressed here: without the dialog it would really print on the default printer.)
+        Sta.Run(() =>
+        {
+            using (var window = new Window(new AppSettings()))
+            {
+                Assert.Equal(Strings.PrintTooltip, window.Form.PrintButton.AccessibleName); // "Print label(s)… (Ctrl+P)"
+            }
+
+            using (var window = new Window(new AppSettings { HideWindowsPrintDialog = true }))
+            {
+                Assert.Equal(Strings.PrintTooltipWithoutDialog, window.Form.PrintButton.AccessibleName); // "Print this label (Ctrl+P)"
+            }
+        });
+    }
+
+    [Fact]
     public void TheColumnShareOfTheLastTime_IsUsedAtTheStart_WithinTheMinimumWidths()
     {
         Sta.Run(() =>

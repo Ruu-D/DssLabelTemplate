@@ -1108,8 +1108,9 @@ internal class MainForm : Form
         _toolTip.SetToolTip(LabelWidthBox, Strings.LabelWidthTooltip);
         _toolTip.SetToolTip(PreviousButton, Strings.PreviousLabel);
         _toolTip.SetToolTip(NextButton, Strings.NextLabel);
-        _toolTip.SetToolTip(PrintButton, Strings.PrintTooltip);
-        PrintButton.AccessibleName = Strings.PrintTooltip; // the button has a picture, no text: for a screen reader
+        string printTooltip = _settings.HideWindowsPrintDialog ? Strings.PrintTooltipWithoutDialog : Strings.PrintTooltip;
+        _toolTip.SetToolTip(PrintButton, printTooltip);
+        PrintButton.AccessibleName = printTooltip; // the button has a picture, no text: for a screen reader
         _toolTip.SetToolTip(ColumnDivider, Strings.ColumnDividerTooltip);
         SaveButton.Text = Strings.SaveTemplate;
         FitFileTexts(); // the description has another length in another language
@@ -1309,6 +1310,7 @@ internal class MainForm : Form
     /// The print button (and Ctrl+P): the Windows print dialog, starting with the printer of the last time and with
     /// "current page" = the label in the preview. "Pages" are the label numbers ("2 / 3"), so the dialog can also print
     /// all labels or a range. Before printing, the printer's page is compared with the label size of the window.
+    /// With HideWindowsPrintDialog (settings.json) there is no dialog: the shown label is printed at once.
     /// </summary>
     internal void PrintLabels()
     {
@@ -1334,11 +1336,19 @@ internal class MainForm : Form
             document.PrinterSettings.ToPage = Preview.Index + 1;
             document.PrinterSettings.PrintRange = PrintRange.CurrentPage;
 
-            // UseEXDialog: the dialog with "current page" (the newer Windows dialog has no page choice).
-            using var dialog = new PrintDialog { Document = document, UseEXDialog = true, AllowCurrentPage = true, AllowSomePages = true };
-            if (dialog.ShowDialog(this) != DialogResult.OK)
+            // HideWindowsPrintDialog (settings.json): no dialog. The label in the preview is printed at once, on the printer
+            // set up above (PrinterName, or else Windows' default printer) with its driver's own settings.
+            if (!_settings.HideWindowsPrintDialog)
             {
-                return;
+                // UseEXDialog: the dialog with "current page" (the newer Windows dialog has no page choice).
+                using var dialog = new PrintDialog { Document = document, UseEXDialog = true, AllowCurrentPage = true, AllowSomePages = true };
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+
+                _settings.PrinterName = document.PrinterSettings.PrinterName;
+                TrySaveSettings();
             }
 
             PrinterSettings chosen = document.PrinterSettings;
@@ -1347,9 +1357,6 @@ internal class MainForm : Form
             {
                 return;
             }
-
-            _settings.PrinterName = chosen.PrinterName;
-            TrySaveSettings();
 
             SizeF paper = LabelPrinter.PaperSize(document.DefaultPageSettings);
             if (!LabelPrinter.PaperFits(paper, Preview.LabelSize))

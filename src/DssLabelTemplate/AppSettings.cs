@@ -66,6 +66,13 @@ internal class AppSettings
     public bool PrintLabelWithRotation { get; set; }
 
     /// <summary>
+    /// True: the print button prints the label in the preview at once, WITHOUT the Windows print dialog (Daan, 2026-10-27),
+    /// on <see cref="PrinterName"/> (when it is installed) or else Windows' default printer, with the driver's own settings.
+    /// The page check and the square-label question still come when needed. ONLY in settings.json, not in the window.
+    /// </summary>
+    public bool HideWindowsPrintDialog { get; set; }
+
+    /// <summary>
     /// Which way a positive ROTATION of a label (from the csv) turns it on the sheet: "CCW" (counter-clockwise, default) or
     /// "CW" (clockwise) (Daan, 2026-10-26). Used by ShowLabelRotation and PrintLabelWithRotation; to be checked on the
     /// machine with a label at 90 or 270. ONLY in settings.json, not in the window. Anything else is "CCW" on loading.

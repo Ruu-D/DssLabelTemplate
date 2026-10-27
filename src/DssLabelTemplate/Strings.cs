@@ -142,6 +142,12 @@ internal static class Strings
         "Imprimer l'étiquette / les étiquettes… (Ctrl+P)",
         "Print label(s)… (Ctrl+P)");
 
+    /// <summary>The print button with HideWindowsPrintDialog (settings.json): prints the shown label at once, no dialog.</summary>
+    public static string PrintTooltipWithoutDialog => T(
+        "Dit label afdrukken (Ctrl+P)",
+        "Imprimer cette étiquette (Ctrl+P)",
+        "Print this label (Ctrl+P)");
+
     /// <summary>The tooltip of the vertical line between the two columns.</summary>
     public static string ColumnDividerTooltip => T(
         "Sleep om de kolommen breder of smaller te maken; dubbelklik voor twee gelijke helften",

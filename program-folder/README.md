@@ -21,6 +21,17 @@ Can be used to force a specific printer.
 - If a printer name is specified, that printer will always be used.
 - If left blank (`""`), the default Windows printer will be used.
 
+### HideWindowsPrintDialog
+
+```json
+"HideWindowsPrintDialog": true
+```
+
+If `true`, the print button (and Ctrl+P) skips the Windows print dialog: the label shown in the preview is printed at once, with the printer driver's own settings. If `false` (default), the Windows print dialog opens first (to choose a printer, or print several labels).
+
+- The printer is `PrinterName` if it is filled in and installed, otherwise the default Windows printer.
+- Note: every print WITH the dialog stores the chosen printer in `PrinterName`. To print without the dialog on the default Windows printer, empty it: `"PrinterName": ""`.
+
 ### SheetRotationInViewer
 
 ```json

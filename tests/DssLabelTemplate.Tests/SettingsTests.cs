@@ -119,14 +119,17 @@ public class SettingsTests
         File.WriteAllText(path, "{ \"Language\": \"en\" }"); // a settings.json of before
         Assert.False(SettingsStore.Load(path).ShowLabelRotation);
         Assert.False(SettingsStore.Load(path).PrintLabelWithRotation);
+        Assert.False(SettingsStore.Load(path).HideWindowsPrintDialog);
 
-        SettingsStore.Save(path, new AppSettings { ShowLabelRotation = true, PrintLabelWithRotation = true });
+        SettingsStore.Save(path, new AppSettings { ShowLabelRotation = true, PrintLabelWithRotation = true, HideWindowsPrintDialog = true });
 
         string text = File.ReadAllText(path);
         Assert.Contains("\"ShowLabelRotation\": true", text); // the names a person edits by hand
         Assert.Contains("\"PrintLabelWithRotation\": true", text);
+        Assert.Contains("\"HideWindowsPrintDialog\": true", text);
         Assert.True(SettingsStore.Load(path).ShowLabelRotation);
         Assert.True(SettingsStore.Load(path).PrintLabelWithRotation);
+        Assert.True(SettingsStore.Load(path).HideWindowsPrintDialog);
     }
 
     [Theory]

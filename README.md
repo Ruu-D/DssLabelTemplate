@@ -63,6 +63,9 @@ its top-left corner.
    turns the PRINT the same way, around the middle of the label, so the operator can stick it on without turning it. Printing
    turned only works for a square label (length = width); for other sizes the program asks whether to print upright. Both are
    off by default and only in the file.
+8. `"HideWindowsPrintDialog": true` in `settings.json` skips the Windows print dialog: the print button prints the shown label
+   at once on `PrinterName` (if filled in and installed) or the default Windows printer, with the driver's own settings.
+   Off by default and only in the file.
 
 ## Open questions
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## Not built yet (2026-10-27, Daan)
+
+- **`HideWindowsPrintDialog`** in `settings.json` ONLY (default false): the print button (and Ctrl+P) prints the shown
+  label at once, without the Windows print dialog, on `PrinterName` when it is installed, otherwise Windows' default
+  printer, with the driver's own settings. The page check and the square-label question still come when needed. The
+  print button's tooltip then reads "Print this label (Ctrl+P)" (three languages). Explained in the packed README.
+- 211 tests (was 210): the setting off by default, saved and loaded; the print button's text with and without it.
+
 ## 1.1.4 — 2026-10-26 (Daan)
 
 - **Delivery:** `dist\v1.1.4\DssLabelTemplate.exe`, 53,212,137 bytes, file version 1.1.4.0, SHA-256
