@@ -30,7 +30,7 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 | Label size fields (length × width in mm, default 100 × 100); objects outside the label are flagged in color red | Done (0.3.0) |
 | Program folder `C:\DssLabelTemplate` with examples; separate file lines for template and CSV; Tab order | Done (0.5.0, checked) |
 | **First release** | **1.0.0** |
-| Print button (reprint on a Zebra ZD220), real QR codes, draggable column divider, new banner text, touch-friendly layout | 1.1.0, customer test version; waiting for a test on the real printer |
+| Print button (reprint on a Zebra ZD220), real QR codes, draggable column divider, new banner text, touch-friendly layout | Done (1.1.0); printing on the ZD220 works with dithering OFF in the driver (tested 2026-10-27) |
 | Window size / position / maximised and column divider remembered; label CSV shown as a table first | Done (1.1.1, published) |
 | Sheet map can be turned (`SheetRotationInViewer` in `settings.json`), for a label PC on a turnable console | Done (1.1.2) |
 | File description moved into "?" icons (hover or tap) and one divider removed: more height for the editor and preview | Done (1.1.2) |
@@ -38,6 +38,7 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 | Zero-point dot on the sheet map; reference corner (`SheetReferenceCorner` in `settings.json`) matching TsDssConverter / DSSClient | Done (1.1.2 rebuild) |
 | Preview 60 % label / 40 % sheet map; `ShowLabelRotation` and `PrintLabelWithRotation` in `settings.json` (turned preview / turned print of a square label) | Done (1.1.3) |
 | Turned preview and print follow the operator's view (rotation + `SheetRotationInViewer`); `LabelDirection` (`CCW` / `CW`) in `settings.json` | Done (1.1.4) |
+| `HideWindowsPrintDialog` in `settings.json`: print the shown label without the Windows dialog | Done (1.1.4 rebuild) |
 
 Third-party components: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence) and
 [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence).
@@ -71,6 +72,6 @@ its top-left corner.
 
 1. The real label size (mm) and a printed label to compare the preview with. Real-life printed labels can also determine if the label preview is rendered correctly.
 2. Real templates, to be copied from a working Duivestein system later.
-3. A test print on the Zebra ZD220: position, sharpness, and scanning the QR code and barcode with the real scanner.
+3. Printing on the Zebra ZD220 works (dithering OFF in the printer driver, tested 2026-10-27). Still open: scanning the QR code and barcode with the real scanner.
 
 Developer: Daan Verhoost — ROGIERS NV/SA.

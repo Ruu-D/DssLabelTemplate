@@ -1,7 +1,14 @@
 # Changelog
 
-## Not built yet (2026-10-27, Daan)
+## 1.1.4 rebuild — 2026-10-27 (same version number, Daan)
 
+- **Delivery:** `dist\v1.1.4\DssLabelTemplate.exe`, 53,212,626 bytes, file version 1.1.4.0, SHA-256
+  `37f8893b8129858dfecb1f061b110513aa6eac759af7ff504506bdecdb309142`. Built by `publish.cmd` after all 211 tests passed;
+  the exe itself was not started. Rebuilt under the SAME number on Daan's request, so two different exes say 1.1.4: tell
+  them apart by this checksum. The first 1.1.4 build (`58e7f644...`) was copied to
+  `dist\_previous-builds\2026-10-27\v1.1.4\` first.
+- **Tested by Daan on the Zebra ZD220 (2026-10-27): printing works perfectly with dithering OFF** in the printer driver
+  (the first real test on the reprint printer; tested with the first 1.1.4 build).
 - **`HideWindowsPrintDialog`** in `settings.json` ONLY (default false): the print button (and Ctrl+P) prints the shown
   label at once, without the Windows print dialog, on `PrinterName` when it is installed, otherwise Windows' default
   printer, with the driver's own settings. The page check and the square-label question still come when needed. The
