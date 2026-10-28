@@ -132,6 +132,8 @@ internal class MainForm : Form
     private Control? _fileRow;          // the rows with the path boxes: the texts above and below get their width (FitFileTexts)
     private bool _showingCsv;           // the left column shows the csv table instead of the template text
     private bool _selectingCsvRow;      // the program (not the user) selects a row of the csv table
+    private bool _fillingCsvGrid;       // the program (not the operator) adds and orders the columns of the csv table
+    private bool _csvColumnOrderSavePending; // a dragged column order will be saved right after the drop
 
     /// <summary>Internal: the file that is open now (the tests check it).</summary>
     internal string? CurrentFile => _currentFile;
@@ -793,7 +795,9 @@ internal class MainForm : Form
         CsvGrid.AllowUserToAddRows = false;
         CsvGrid.AllowUserToDeleteRows = false;
         CsvGrid.AllowUserToResizeRows = false;
-        CsvGrid.AllowUserToOrderColumns = false;
+        // The operator may drag the column titles into another order (Daan, 2026-10-27); it is kept in settings.json.
+        CsvGrid.AllowUserToOrderColumns = true;
+        CsvGrid.ColumnDisplayIndexChanged += (sender, e) => OnCsvColumnMoved();
         CsvGrid.RowHeadersVisible = false;
         CsvGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         CsvGrid.MultiSelect = false;
@@ -838,6 +842,7 @@ internal class MainForm : Form
 
         if (csv != null)
         {
+            _fillingCsvGrid = true; // the columns move while they are added and put in order: that is not the operator
             CsvGrid.Columns.Add("number", Strings.CsvNumberColumn);
             foreach (string column in csv.Columns)
             {
@@ -849,6 +854,12 @@ internal class MainForm : Form
                 column.SortMode = DataGridViewColumnSortMode.NotSortable; // row n stays label n
             }
 
+            // The label number stays the first column: a frozen column cannot be dragged among the others (and it stays
+            // in view when the table scrolls sideways).
+            CsvGrid.Columns[0].Frozen = true;
+            ApplyCsvColumnOrder();
+            _fillingCsvGrid = false;
+
             for (int row = 0; row < csv.Rows.Count; row++)
             {
                 var cells = new List<object> { row + 1 };
@@ -859,6 +870,68 @@ internal class MainForm : Form
 
         FitCsvColumns();
         _selectingCsvRow = false;
+    }
+
+    /// <summary>
+    /// Puts the csv columns in the order the operator dragged them the last time (settings.json: CsvColumnOrder), right
+    /// after the number column. Columns that are not in that list keep their file order after the ones that are.
+    /// </summary>
+    private void ApplyCsvColumnOrder()
+    {
+        int next = 1; // place 0 is the number column
+        foreach (string name in _settings.CsvColumnOrder)
+        {
+            DataGridViewColumn? column = CsvGrid.Columns.Cast<DataGridViewColumn>().Skip(1)
+                .FirstOrDefault(c => string.Equals(c.HeaderText, name, StringComparison.OrdinalIgnoreCase));
+            if (column != null && column.DisplayIndex >= next) // ">= next": a name twice in the list is placed once
+            {
+                column.DisplayIndex = next++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// A column of the csv table was dragged to another place. One drop moves several columns (each one raises the event),
+    /// so the order is saved once, right after the drop.
+    /// </summary>
+    private void OnCsvColumnMoved()
+    {
+        if (_fillingCsvGrid || _csvColumnOrderSavePending)
+        {
+            return;
+        }
+
+        if (!IsHandleCreated)
+        {
+            SaveCsvColumnOrder();
+            return;
+        }
+
+        _csvColumnOrderSavePending = true;
+        BeginInvoke(SaveCsvColumnOrder);
+    }
+
+    /// <summary>
+    /// Keeps the order of the csv table in settings.json: the columns as they are shown now, then the names of the saved
+    /// order that this csv does not have (so a csv with other columns does not lose them).
+    /// </summary>
+    private void SaveCsvColumnOrder()
+    {
+        _csvColumnOrderSavePending = false;
+        List<string> shown = CsvGrid.Columns.Cast<DataGridViewColumn>()
+            .Where(column => column.Index != 0) // not the number column
+            .OrderBy(column => column.DisplayIndex)
+            .Select(column => column.HeaderText)
+            .ToList();
+        if (shown.Count == 0)
+        {
+            return;
+        }
+
+        var order = new List<string>(shown);
+        order.AddRange(_settings.CsvColumnOrder.Where(name => !shown.Contains(name, StringComparer.OrdinalIgnoreCase)));
+        _settings.CsvColumnOrder = order;
+        TrySaveSettings();
     }
 
     /// <summary>

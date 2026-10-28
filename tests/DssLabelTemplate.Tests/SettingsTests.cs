@@ -164,6 +164,26 @@ public class SettingsTests
     }
 
     [Fact]
+    public void TheCsvColumnOrder_IsSavedAndLoaded_EmptyByDefault_WithoutBlankNames()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        File.WriteAllText(path, "{ \"Language\": \"en\" }"); // a settings.json of before
+        Assert.Empty(SettingsStore.Load(path).CsvColumnOrder);
+
+        SettingsStore.Save(path, new AppSettings { CsvColumnOrder = new List<string> { "ID", "DESCRIPTION" } });
+        Assert.Contains("\"CsvColumnOrder\": [", File.ReadAllText(path));
+        Assert.Equal(new[] { "ID", "DESCRIPTION" }, SettingsStore.Load(path).CsvColumnOrder);
+
+        File.WriteAllText(path, "{ \"CsvColumnOrder\": null }");
+        Assert.Empty(SettingsStore.Load(path).CsvColumnOrder);
+
+        File.WriteAllText(path, "{ \"CsvColumnOrder\": [ \"ID\", \"\", \"  \", \"X\" ] }");
+        Assert.Equal(new[] { "ID", "X" }, SettingsStore.Load(path).CsvColumnOrder);
+    }
+
+    [Fact]
     public void TheReferenceCorner_IsSavedAndLoaded_WithDSSClientsName()
     {
         using var folder = new TempFolder();

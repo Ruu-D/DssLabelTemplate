@@ -32,6 +32,14 @@ If `true`, the print button (and Ctrl+P) skips the Windows print dialog: the lab
 - The printer is `PrinterName` if it is filled in and installed, otherwise the default Windows printer.
 - Note: every print WITH the dialog stores the chosen printer in `PrinterName`. To print without the dialog on the default Windows printer, empty it: `"PrinterName": ""`.
 
+### CsvColumnOrder
+
+```json
+"CsvColumnOrder": [ "ID", "DESCRIPTION", "PANELLENGTH" ]
+```
+
+The order of the columns in the label CSV table. You do not need to type it: drag a column title to another place in the table and the program saves the order here by itself. It is used again for every label CSV that is opened. Columns that are not in the list follow in the order of the file. The label number column always stays first. The CSV file itself is never changed. Empty (`[]`) = the order of the file.
+
 ### SheetRotationInViewer
 
 ```json

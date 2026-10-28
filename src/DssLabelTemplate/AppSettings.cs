@@ -73,6 +73,14 @@ internal class AppSettings
     public bool HideWindowsPrintDialog { get; set; }
 
     /// <summary>
+    /// The order of the columns in the csv table, as the operator dragged them (Daan, 2026-10-27): the column names, first
+    /// = left. Saved after every drag; used again for every label-csv that is opened. Columns of a csv that are not in the
+    /// list keep their file order after the ones that are; names the csv does not have are skipped (and kept for a csv
+    /// that has them). Only what the table shows: the csv file itself is never changed. Empty = the order of the file.
+    /// </summary>
+    public List<string> CsvColumnOrder { get; set; } = new();
+
+    /// <summary>
     /// Which way a positive ROTATION of a label (from the csv) turns it on the sheet: "CCW" (counter-clockwise, default) or
     /// "CW" (clockwise) (Daan, 2026-10-26). Used by ShowLabelRotation and PrintLabelWithRotation; to be checked on the
     /// machine with a label at 90 or 270. ONLY in settings.json, not in the window. Anything else is "CCW" on loading.
@@ -173,6 +181,7 @@ internal static class SettingsStore
             settings.LastFile ??= "";
             settings.LastCsvFile ??= "";
             settings.PrinterName ??= "";
+            settings.CsvColumnOrder = (settings.CsvColumnOrder ?? new()).Where(name => !string.IsNullOrWhiteSpace(name)).ToList();
 
             // A window size edited by hand into something impossible: forget the place (standard size, in the middle).
             if (settings.WindowWidth <= 0 || settings.WindowHeight <= 0)

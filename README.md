@@ -39,6 +39,7 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 | Preview 60 % label / 40 % sheet map; `ShowLabelRotation` and `PrintLabelWithRotation` in `settings.json` (turned preview / turned print of a square label) | Done (1.1.3) |
 | Turned preview and print follow the operator's view (rotation + `SheetRotationInViewer`); `LabelDirection` (`CCW` / `CW`) in `settings.json` | Done (1.1.4) |
 | `HideWindowsPrintDialog` in `settings.json`: print the shown label without the Windows dialog | Done (1.1.4 rebuild) |
+| Columns of the label CSV table can be dragged into another order, kept in `settings.json` (`CsvColumnOrder`); the CSV file is not changed | Done (1.1.4 rebuild) |
 
 Third-party components: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence) and
 [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence).
@@ -67,6 +68,9 @@ its top-left corner.
 8. `"HideWindowsPrintDialog": true` in `settings.json` skips the Windows print dialog: the print button prints the shown label
    at once on `PrinterName` (if filled in and installed) or the default Windows printer, with the driver's own settings.
    Off by default and only in the file.
+9. The columns of the label CSV table can be dragged into another order (drag a column title). The order is kept in
+   `settings.json` (`CsvColumnOrder`) and used for every CSV that is opened; the label number stays first. Only the view:
+   the CSV file itself is never changed.
 
 ## Open questions
 

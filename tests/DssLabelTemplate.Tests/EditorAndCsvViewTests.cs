@@ -193,6 +193,57 @@ public class EditorAndCsvViewTests
         });
     }
 
+    private static List<string> ShownColumns(MainForm form) =>
+        form.CsvGrid.Columns.Cast<DataGridViewColumn>().OrderBy(column => column.DisplayIndex).Select(column => column.HeaderText).ToList();
+
+    [Fact]
+    public void ADraggedColumn_IsKeptInTheSettings_AndTheNumberColumnStaysFirst()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+            form.OpenLabelFiles(Samples.File(Samples.Template), Samples.File(Samples.Csv));
+            window.Pump();
+            Assert.Empty(window.Settings.CsvColumnOrder); // opening alone saves nothing
+
+            Assert.True(form.CsvGrid.AllowUserToOrderColumns);
+            Assert.True(form.CsvGrid.Columns[0].Frozen); // the label number cannot be dragged among the others
+
+            // What a drag does: the column gets another place (BARCODE1, the last one, to the front).
+            form.CsvGrid.Columns.Cast<DataGridViewColumn>().Single(column => column.HeaderText == "BARCODE1").DisplayIndex = 1;
+            window.Pump();
+
+            Assert.Equal(new[] { "BARCODE1", "LENGTH", "WIDTH", "ID", "XPOS", "YPOS", "ROTATION", "ORDERNO", "PW", "PH" },
+                window.Settings.CsvColumnOrder);
+            Assert.Equal(Strings.CsvNumberColumn, ShownColumns(form)[0]);
+        });
+    }
+
+    [Fact]
+    public void TheSavedColumnOrder_IsUsedForEveryCsvThatIsOpened_UnknownNamesAreSkippedAndKept()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            window.Settings.CsvColumnOrder = new List<string> { "id", "NOT_IN_THIS_CSV", "XPOS" }; // any case
+            MainForm form = window.Form;
+
+            form.OpenLabelFiles(Samples.File(Samples.Template), Samples.File(Samples.Csv));
+            window.Pump();
+
+            Assert.Equal(new[] { Strings.CsvNumberColumn, "ID", "XPOS", "LENGTH", "WIDTH", "YPOS", "ROTATION", "ORDERNO", "PW", "PH", "BARCODE1" },
+                ShownColumns(form));
+            Assert.Equal("350.2", form.CsvGrid.Rows[2].Cells[9].Value); // only the view moved: the cells are the same
+
+            // A drag in this csv keeps the name this csv does not have, at the end.
+            form.CsvGrid.Columns.Cast<DataGridViewColumn>().Single(column => column.HeaderText == "PW").DisplayIndex = 1;
+            window.Pump();
+            Assert.Equal("PW", window.Settings.CsvColumnOrder[0]);
+            Assert.Equal("NOT_IN_THIS_CSV", window.Settings.CsvColumnOrder[^1]);
+        });
+    }
+
     [Fact]
     public void TheArrows_SelectTheCsvRow_AndClickingARow_ShowsItsLabel()
     {

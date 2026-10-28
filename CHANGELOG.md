@@ -2,13 +2,19 @@
 
 ## 1.1.4 rebuild — 2026-10-27 (same version number, Daan)
 
-- **Delivery:** `dist\v1.1.4\DssLabelTemplate.exe`, 53,212,626 bytes, file version 1.1.4.0, SHA-256
-  `37f8893b8129858dfecb1f061b110513aa6eac759af7ff504506bdecdb309142`. Built by `publish.cmd` after all 211 tests passed;
-  the exe itself was not started. Rebuilt under the SAME number on Daan's request, so two different exes say 1.1.4: tell
-  them apart by this checksum. The first 1.1.4 build (`58e7f644...`) was copied to
-  `dist\_previous-builds\2026-10-27\v1.1.4\` first.
+- **Delivery:** `dist\v1.1.4\DssLabelTemplate.exe`, 53,214,092 bytes, file version 1.1.4.0, SHA-256
+  `858ed3f2a94c86006ff783b9f1186a07f4227402151a5d770056b3f73f04f369`. Built by `publish.cmd` after all 214 tests passed;
+  the exe itself was not started. Rebuilt under the SAME number twice on Daan's request, so three different exes say
+  1.1.4: tell them apart by this checksum. Kept: the first 1.1.4 build (`58e7f644...`) in
+  `dist\_previous-builds\2026-10-27\v1.1.4\`, the second (`37f8893b...`, with HideWindowsPrintDialog but without the
+  draggable columns) in `dist\_previous-builds\2026-10-27-second\v1.1.4\`.
 - **Tested by Daan on the Zebra ZD220 (2026-10-27): printing works perfectly with dithering OFF** in the printer driver
   (the first real test on the reprint printer; tested with the first 1.1.4 build).
+- **Columns of the csv table can be dragged into another order** (the operator's question): the order is saved at once in
+  `settings.json` as `CsvColumnOrder` and used for every label-csv that is opened; columns not in the list follow in file
+  order; the label number column stays first (frozen). Only the view: the csv file is never changed. Explained in the
+  packed README. 214 tests (was 211): a drag is saved, the saved order is applied (any case, unknown names skipped and
+  kept), the setting saved / loaded / without blank names.
 - **`HideWindowsPrintDialog`** in `settings.json` ONLY (default false): the print button (and Ctrl+P) prints the shown
   label at once, without the Windows print dialog, on `PrinterName` when it is installed, otherwise Windows' default
   printer, with the driver's own settings. The page check and the square-label question still come when needed. The
