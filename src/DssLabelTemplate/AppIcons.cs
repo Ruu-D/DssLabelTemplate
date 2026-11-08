@@ -88,6 +88,15 @@ internal static class AppIcons
     }
 
     /// <summary>
+    /// The csv icon (media\CSV.png, a navy tag with "CSV" on transparent) on the button left of the board button, which
+    /// shows the csv table. Shown as high as the board icon; wider than high, so 144 on its long side for a screen at 400%.
+    /// </summary>
+    public static Image Csv()
+    {
+        return TrimmedAndScaled("csv.png", 144);
+    }
+
+    /// <summary>
     /// The "?" icon before the two path captions (media\howto.png, a navy circle with a white question mark): its hover
     /// text describes the two kinds of label files. Shown 16 pixels high at 100%, so 64 is enough for a screen at 400%.
     /// </summary>

@@ -287,7 +287,7 @@ public class EditorAndCsvViewTests
                 Assert.True(title.Height < 2 * title.Font.Height, $"'{title.Text}' takes more than one line");
             }
 
-            Assert.Equal(form.CsvViewButton.Height, form.EditorHeader.Height);
+            Assert.Equal(form.XmlViewButton.Height, form.EditorHeader.Height);
             Assert.Equal(form.EditorHeader.Height, form.PreviewHeader.Height); // the label size fields are as high as a button
         });
     }
@@ -306,14 +306,14 @@ public class EditorAndCsvViewTests
             form.OpenLabelFiles(Samples.File(Samples.Template), Samples.File(Samples.Csv));
             window.Pump();
 
-            foreach (Button button in new Button[] { form.XmlViewButton, form.CsvViewButton })
+            foreach (Button button in new Button[] { form.XmlViewButton })
             {
                 int needed = TextRenderer.MeasureText(button.Text, button.Font).Width;
                 Assert.True(needed + 8 <= button.Width, $"'{button.Text}' needs {needed} in a button of {button.Width}");
             }
 
             int Right(Control control) => control.PointToScreen(new Point(control.Width, 0)).X;
-            Assert.Equal(Right(form.EditorArea), Right(form.CsvViewButton));
+            Assert.Equal(Right(form.EditorArea), Right(form.XmlViewButton));
         });
     }
 }

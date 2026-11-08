@@ -67,10 +67,72 @@ public class MainFormTests
             Assert.NotNull(form.BoardButton.Image);
             Assert.False(form.BoardButton.TabStop);
 
-            form.DragColumnDivider(0); // the left column as narrow as it can be: the logo and the button still fit
+            // The csv button (2026-11-08): just left of the board button, as big, an icon without text.
+            Assert.True(form.CsvViewButton.Visible);
+            Assert.Equal(form.BoardButton.Size, form.CsvViewButton.Size);
+            Assert.Equal(Top(form.BoardButton), Top(form.CsvViewButton));
+            Assert.True(RightEdge(form.CsvViewButton) < form.BoardButton.PointToScreen(Point.Empty).X, "left of the board button");
+            Assert.True(RightEdge(form.LogoPicture) < form.CsvViewButton.PointToScreen(Point.Empty).X, "right of the logo");
+            Assert.NotNull(form.CsvViewButton.Image);
+            Assert.Equal("", form.CsvViewButton.Text);
+            Assert.False(form.CsvViewButton.TabStop);
+            Assert.True(form.EditorHeader.Contains(form.XmlViewButton), "Template (xml) stays above the column");
+            Assert.False(form.EditorHeader.Contains(form.CsvViewButton));
+
+            form.DragColumnDivider(0); // the left column as narrow as it can be: the logo and the buttons still fit
             window.Pump();
-            Assert.True(RightEdge(form.LogoPicture) < form.BoardButton.PointToScreen(Point.Empty).X);
+            Assert.True(RightEdge(form.LogoPicture) < form.CsvViewButton.PointToScreen(Point.Empty).X);
+            Assert.True(RightEdge(form.CsvViewButton) < form.BoardButton.PointToScreen(Point.Empty).X);
             Assert.Equal(RightEdge(form.EditorArea), RightEdge(form.BoardButton));
+        });
+    }
+
+    [Fact]
+    public void TheCsvAndTheBoardButton_AreTheSwitch_ClosingTheBoardShowsTheTable()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+            form.OpenLabelFiles(Samples.File(Samples.Template), Samples.File(Samples.Csv));
+            window.Pump();
+
+            form.XmlViewButton.PerformClick(); // the template text
+            form.BoardButton.PerformClick();   // the board
+            window.Pump();
+            Assert.True(form.ShowingBoard);
+            Assert.Equal(Theme.Brand, form.BoardButton.NormalFill);
+            Assert.NotEqual(Theme.Brand, form.XmlViewButton.NormalFill);
+
+            form.BoardButton.PerformClick(); // closed: the table, not the text that was shown before
+            window.Pump();
+            Assert.False(form.ShowingBoard);
+            Assert.True(form.ShowingCsv);
+            Assert.Equal(Theme.Brand, form.CsvViewButton.NormalFill);
+
+            form.BoardButton.PerformClick();
+            form.CsvViewButton.PerformClick(); // the csv button closes the board too
+            window.Pump();
+            Assert.False(form.ShowingBoard);
+            Assert.True(form.CsvGrid.Parent!.Visible);
+            Assert.NotEqual(Theme.Brand, form.BoardButton.NormalFill);
+
+            form.CsvViewButton.PerformClick(); // again: the table stays (the template is chosen above the column)
+            Assert.True(form.ShowingCsv);
+        });
+
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+            form.OpenLabelFiles(Samples.File(Samples.LabelXml), null); // no csv: closing the board shows the text
+            window.Pump();
+            Assert.False(form.CsvViewButton.Visible);
+            form.BoardButton.PerformClick();
+            form.BoardButton.PerformClick();
+            window.Pump();
+            Assert.False(form.ShowingCsv);
+            Assert.True(form.Editor.Parent!.Visible);
         });
     }
 
@@ -539,7 +601,7 @@ public class MainFormTests
             window.Pump();
             Control editorFrame = form.Editor.Parent!;
             Assert.True(form.XmlViewButton.Visible && form.SaveButton.Visible);
-            Assert.True(RightEdge(form.CsvViewButton) <= RightEdge(editorFrame), "the buttons still fit above the editor");
+            Assert.True(RightEdge(form.XmlViewButton) <= RightEdge(editorFrame), "the buttons still fit above the editor");
             Assert.True(form.SaveButton.PointToScreen(Point.Empty).X >= editorFrame.PointToScreen(Point.Empty).X, "save still fits");
 
             form.DragColumnDivider(form.Workspace.Width); // all the way to the right
@@ -820,7 +882,7 @@ public class MainFormTests
             using var window = new Window();
             MainForm form = window.Form;
 
-            foreach (Button button in new Button[] { form.XmlBrowseButton, form.CsvBrowseButton, form.SaveButton, form.XmlViewButton, form.CsvViewButton, form.PreviousButton, form.NextButton })
+            foreach (Button button in new Button[] { form.XmlBrowseButton, form.CsvBrowseButton, form.SaveButton, form.XmlViewButton, form.PreviousButton, form.NextButton })
             {
                 int needed = TextRenderer.MeasureText(button.Text, button.Font).Width;
                 Assert.True(needed + 8 <= button.Width, $"'{button.Text}' needs {needed} in a button of {button.Width}");
@@ -866,7 +928,7 @@ public class MainFormTests
 
             Control sizeFrame = form.LabelWidthBox.Parent!;
             Assert.Equal(RightEdge(form.Preview), RightEdge(sizeFrame));
-            Assert.Equal(Top(form.CsvViewButton), Top(sizeFrame)); // in the title row, in line with the view buttons
+            Assert.Equal(Top(form.XmlViewButton), Top(sizeFrame)); // in the title row, in line with the view button
             Assert.True(RightEdge(form.PreviewCaption) <= form.LabelSizePanel.PointToScreen(Point.Empty).X, "the title runs into the label size");
             Assert.Equal(form.XmlBrowseButton.Parent!.Width, form.FileStatus.Width);
         });

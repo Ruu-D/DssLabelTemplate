@@ -53,7 +53,7 @@ internal class MainForm : Form
     // The two fields of the label size: as high as the buttons, room for "1000,5".
     private static readonly Size LabelSizeBoxSize = new(60, 28);
 
-    // The two buttons above the left column (template / csv): wide enough for "CSV d'étiquettes" (a test checks all languages).
+    // The "Template (xml)" button above the left column: wide enough for its text (a test checks all languages).
     private static readonly Size ViewButtonSize = new(120, 28);
 
     // The csv table, for a touch screen: its font this many points bigger than the window's (9 → 13 pt), and every row this
@@ -64,12 +64,15 @@ internal class MainForm : Form
     // The save button left of them: wide enough for "Enregistrer le modèle" (a test checks all languages).
     private static readonly Size SaveButtonSize = new(150, 28);
 
-    // The editor column is never narrower than its title buttons (save + the two view buttons); the title itself may
-    // then shrink to "…". The preview column keeps at least MinimumColumnWidth.
-    private static readonly int MinimumEditorColumnWidth = SaveButtonSize.Width + 4 + 2 * ViewButtonSize.Width + 4;
-
     // The company logo at the bottom left and the user-guide icon next to the app version (at 100%).
     private static readonly Size LogoSize = new(35, 32);
+
+    // The editor column is never narrower than its title buttons (save + "Template (xml)"), nor than the row below it (the
+    // logo and the csv and board buttons at their widest); the title itself may then shrink to "…". The preview column keeps
+    // at least MinimumColumnWidth. (Declared after LogoSize: a static field can only use the ones above it.)
+    private static readonly int MinimumEditorColumnWidth = Math.Max(
+        SaveButtonSize.Width + 4 + ViewButtonSize.Width + 4,
+        LogoSize.Width + NavigationSideRoom + 2 * NavigationButtonMaximumWidth + 4);
     private static readonly Size UserGuideIconSize = new(16, 16);
 
     // The "?" icon before each path caption (at 100%), and the longest line of its hover text (in characters): a WinForms
@@ -101,9 +104,9 @@ internal class MainForm : Form
     internal readonly TextBox LabelWidthBox = new();  // the label width in mm (vertical, Y)
     internal readonly TableLayoutPanel LabelSizePanel = new(); // the caption and the two fields, right of the preview title
     internal readonly Label EditorCaption = new();
-    internal readonly RoundedButton XmlViewButton = new(); // shows the template text (only visible with a label-csv)
-    internal readonly RoundedButton CsvViewButton = new(); // shows the csv data as a table
-    internal readonly TableLayoutPanel EditorHeader = new(); // the editor title with the two view buttons
+    internal readonly RoundedButton XmlViewButton = new(); // above the left column: shows the template text (only with a label-csv)
+    internal readonly RoundedButton CsvViewButton = new(); // below the left column, left of the board button: the csv table (an icon)
+    internal readonly TableLayoutPanel EditorHeader = new(); // the editor title with save and "Template (xml)"
     internal readonly Panel EditorArea = new();             // holds the editor and the csv table, one of them visible
     internal readonly DataGridView CsvGrid = new();         // the label-csv, read-only, one row per label
     internal readonly Label PreviewCaption = new();
@@ -748,9 +751,10 @@ internal class MainForm : Form
 
     /// <summary>
     /// The title of the left column and, against its right edge, the blue "Template opslaan" (only when the text was
-    /// changed, Daan 2026-10-25) and the two buttons "Template (xml)" / "Label-csv" that choose what the column shows
-    /// (only visible when a label-csv is open). Like the preview header, always as high as a button, so nothing jumps
-    /// when the buttons appear.
+    /// changed, Daan 2026-10-25) and "Template (xml)", which shows the template text (only visible when a label-csv is
+    /// open). The csv table and the board are chosen with the two icon buttons below the column (Daan, 2026-11-08:
+    /// the "Label-csv" button moved there). Like the preview header, always as high as a button, so nothing jumps when
+    /// the buttons appear.
     /// </summary>
     private Control BuildEditorHeader()
     {
@@ -765,30 +769,24 @@ internal class MainForm : Form
         // No AcceptButton: Enter in the path box opens the file, Enter in the editor starts a new line.
 
         XmlViewButton.Size = ViewButtonSize;
-        XmlViewButton.Margin = new Padding(0, 0, 4, 0);
-        CsvViewButton.Size = ViewButtonSize;
-        CsvViewButton.Margin = new Padding(0);
-        // These two also close the board: the user chose what the left column must show.
+        XmlViewButton.Margin = new Padding(0);
+        // Also closes the board: the user chose what the left column must show.
         XmlViewButton.Click += (sender, e) => { _showingBoard = false; ShowCsvView(false); };
-        CsvViewButton.Click += (sender, e) => { _showingBoard = false; ShowCsvView(true); };
 
-        EditorHeader.ColumnCount = 4;
+        EditorHeader.ColumnCount = 3;
         EditorHeader.RowCount = 1;
         EditorHeader.AutoSize = true;
         EditorHeader.Dock = DockStyle.Fill;
         EditorHeader.Margin = new Padding(0, 0, 0, 4);
         EditorHeader.MinimumSize = new Size(0, ViewButtonSize.Height);
         EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        for (int i = 0; i < 3; i++)
-        {
-            EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        }
+        EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
         EditorHeader.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         EditorHeader.Controls.Add(EditorCaption, 0, 0);
         EditorHeader.Controls.Add(SaveButton, 1, 0);
         EditorHeader.Controls.Add(XmlViewButton, 2, 0);
-        EditorHeader.Controls.Add(CsvViewButton, 3, 0);
         return EditorHeader;
     }
 
@@ -1034,12 +1032,19 @@ internal class MainForm : Form
 
     /// <summary>
     /// The "View board" button (Daan, 2026-11-08): true = the left column shows the board, the sheet with all label
-    /// positions (<see cref="SheetBoard"/>); false = back to the text or table it showed before. Only when the shown label
-    /// knows its sheet.
+    /// positions (<see cref="SheetBoard"/>); false = closes it. Only when the shown label knows its sheet.
+    /// The switch is between the csv table and the board (Daan, 2026-11-08): closing the board shows the csv table when a
+    /// label-csv is open (also when the template text was shown before), otherwise the text.
     /// </summary>
     internal void ShowBoard(bool board)
     {
+        bool closing = _showingBoard && !board;
         _showingBoard = board && Preview.ShownLabelHasSheet;
+        if (closing && _csv != null)
+        {
+            _showingCsv = true;
+        }
+
         ShowLeftColumn();
     }
 
@@ -1050,8 +1055,8 @@ internal class MainForm : Form
         Editor.Parent!.Visible = !_showingBoard && !_showingCsv;
         CsvGrid.Parent!.Visible = !_showingBoard && _showingCsv;
 
-        // While the board is shown, the board button is the selected one ("pressed", in the brand colour) and the two
-        // view buttons above the column are both not.
+        // Exactly one of the three is "pressed" (in the brand colour): Template (xml) above the column, or the csv or the
+        // board button below it.
         Theme.StyleToggleButton(XmlViewButton, selected: !_showingBoard && !_showingCsv);
         Theme.StyleToggleButton(CsvViewButton, selected: !_showingBoard && _showingCsv);
         Theme.StyleToggleButton(BoardButton, selected: _showingBoard);
@@ -1202,7 +1207,7 @@ internal class MainForm : Form
                             rowWidth / 2 - CounterWidthNeeded() - sideRoom); // the counter beside the left arrow
         int width = Math.Max(LogicalToDeviceUnits(NavigationButtonSmallestWidth),
                              Math.Min(LogicalToDeviceUnits(NavigationButtonMaximumWidth), fits));
-        foreach (RoundedButton button in new[] { BoardButton, PreviousButton, NextButton, PrintButton })
+        foreach (RoundedButton button in new[] { CsvViewButton, BoardButton, PreviousButton, NextButton, PrintButton })
         {
             if (button.Width != width) // also stops the loop: a new width lays the row out again
             {
@@ -1238,11 +1243,23 @@ internal class MainForm : Form
 
     /// <summary>
     /// The last row below the LEFT column: the logo at the left and, against the vertical line (Daan, 2026-11-08), the
-    /// board button — below the column it changes, and just left of the counter below the preview. Not AutoSize: as wide
-    /// as the column and as high as the row below the preview (20 px room + a big button), so the bottoms line up.
+    /// csv button and the board button — below the column they change, and just left of the counter below the preview.
+    /// Together they are the switch between the csv table and the board. Not AutoSize: as wide as the column and as high
+    /// as the row below the preview (20 px room + a big button), so the bottoms line up.
     /// </summary>
     private Control BuildLeftBottomRow()
     {
+        // The csv table (Daan, 2026-11-08: was the "Label-csv" text button above the column). Only with a label-csv.
+        CsvViewButton.Size = NavigationButtonSize;
+        CsvViewButton.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
+        CsvViewButton.Margin = new Padding(0, 0, 4, 0); // the same gap as between the arrows
+        CsvViewButton.Image = AppIcons.Csv();
+        CsvViewButton.IconHeight = 3 * RoundedButton.DefaultIconHeight / 2; // the tag is twice as wide as high: still fits a narrow button
+        CsvViewButton.TabStop = false;
+        CsvViewButton.Visible = false; // only with a label-csv (UpdateNavigation)
+        Theme.StyleToggleButton(CsvViewButton, selected: false);
+        CsvViewButton.Click += (sender, e) => { _showingBoard = false; ShowCsvView(true); };
+
         BoardButton.Size = NavigationButtonSize;
         BoardButton.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
         BoardButton.Margin = new Padding(0);
@@ -1255,7 +1272,7 @@ internal class MainForm : Form
 
         var row = new TableLayoutPanel
         {
-            ColumnCount = 2,
+            ColumnCount = 3,
             RowCount = 1,
             AutoSize = false,
             Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
@@ -1264,9 +1281,11 @@ internal class MainForm : Form
         };
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         row.Controls.Add(BuildLogo(), 0, 0);
-        row.Controls.Add(BoardButton, 1, 0);
+        row.Controls.Add(CsvViewButton, 1, 0);
+        row.Controls.Add(BoardButton, 2, 0);
         return row;
     }
 
@@ -1419,7 +1438,8 @@ internal class MainForm : Form
         CsvBrowseButton.Text = Strings.Browse;
         EditorCaption.Text = LeftColumnCaption();
         XmlViewButton.Text = Strings.XmlViewButton;
-        CsvViewButton.Text = Strings.CsvViewButton;
+        _toolTip.SetToolTip(CsvViewButton, Strings.CsvViewTooltip);
+        CsvViewButton.AccessibleName = Strings.CsvViewTooltip; // a picture, no text: for a screen reader
         PreviewCaption.Text = Strings.PreviewCaption;
         LabelSizeCaption.Text = Strings.LabelSizeCaption;
         _toolTip.SetToolTip(LabelLengthBox, Strings.LabelLengthTooltip);
@@ -1884,7 +1904,7 @@ internal class MainForm : Form
         // Print: as soon as there is a label to print (also just one); not for broken xml or an empty label file.
         PrintButton.Visible = count > 0;
 
-        // The two view buttons only with a label-csv that is used; the csv table follows the label of the preview.
+        // "Template (xml)" and the csv button only with a label-csv that is used; the csv table follows the label of the preview.
         bool csv = _csv != null && !_isLabelXml;
         XmlViewButton.Visible = csv;
         CsvViewButton.Visible = csv;

@@ -27,6 +27,7 @@
     <EmbeddedResource Include="..\..\media\user-guide.png" LogicalName="user-guide.png" />
     <EmbeddedResource Include="..\..\media\Print.png" LogicalName="print.png" />
     <EmbeddedResource Include="..\..\media\Board.png" LogicalName="board.png" />
+    <EmbeddedResource Include="..\..\media\CSV.png" LogicalName="csv.png" />
     <EmbeddedResource Include="..\..\media\howto.png" LogicalName="howto.png" />
   </ItemGroup>
 

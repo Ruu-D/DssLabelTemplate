@@ -126,9 +126,15 @@ internal static class Strings
     public static string EditorCaption => T("Tekst van het template", "Texte du modèle", "Template text");
     public static string CsvCaption => T("Gegevens (alleen lezen)", "Données (lecture seule)", "Data (read-only)");
 
-    /// <summary>The two buttons above the left column (only with a label-csv): the template text or the csv data.</summary>
+    /// <summary>
+    /// Only with a label-csv: the button above the left column (the template text) and the tooltip of the csv icon button
+    /// below it (the csv data; was a text button above the column until 2026-11-08).
+    /// </summary>
     public static string XmlViewButton => T("Template (xml)", "Modèle (xml)", "Template (XML)");
-    public static string CsvViewButton => T("Label-csv", "CSV d'étiquettes", "Label CSV");
+    public static string CsvViewTooltip => T(
+        "Label-csv: de gegevens als tabel in de linkerkolom",
+        "CSV d'étiquettes : les données en tableau dans la colonne de gauche",
+        "Label CSV: the data as a table in the left column");
 
     /// <summary>The first column of the csv table: the number of the label, as in "2 / 3" above the preview.</summary>
     public const string CsvNumberColumn = "#";
@@ -139,9 +145,9 @@ internal static class Strings
     /// <summary>The board view in the left column (the "View board" button left of the arrows): its title and tooltip.</summary>
     public static string BoardCaption => T("Plaat met de labelposities", "Panneau avec les positions des étiquettes", "Board with the label positions");
     public static string BoardTooltip => T(
-        "Plaat tonen: alle labelposities in de linkerkolom (nog eens klikken: terug)",
-        "Afficher le panneau : toutes les positions des étiquettes dans la colonne de gauche (cliquer à nouveau : retour)",
-        "View board: all label positions in the left column (click again to go back)");
+        "Plaat tonen: alle labelposities in de linkerkolom (nog eens klikken: terug naar de tabel)",
+        "Afficher le panneau : toutes les positions des étiquettes dans la colonne de gauche (cliquer à nouveau : retour au tableau)",
+        "View board: all label positions in the left column (click again to go back to the table)");
     public static string BoardWithoutSheet => T(
         "Deze labels hebben geen plaatformaat: er is geen plaat om te tonen.",
         "Ces étiquettes n'ont pas de format de panneau : il n'y a pas de panneau à afficher.",

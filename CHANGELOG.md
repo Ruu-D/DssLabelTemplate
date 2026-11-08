@@ -1,9 +1,30 @@
 # Changelog
 
+## 1.2.0 rebuild — 2026-11-08 — csv button below the left column (Daan)
+
+Released under the same number on Daan's request.
+
+- **Delivery:** `dist\v1.2.0\DssLabelTemplate.exe`, 54,561,753 bytes, file version 1.2.0.0, SHA-256
+  `b9cdce71554da5484f5c82d5f4f453f62988b75ec6f54b611f0c3c5feb86bd91`. Built by `publish.cmd` after all 234 tests passed;
+  started once with a scratch data folder (window opened, data folder written). The first 1.2.0 build (`d9c60786…`, below)
+  is kept in `dist\_previous-builds\2026-11-08\v1.2.0\`.
+
+- **The `Label-csv` text button above the left column became an icon button below it** (`CsvViewButton`, icon
+  `media\CSV.png`), just left of the board button and as big (touch-sized, like the arrows). `Template (xml)` stays above
+  the column and moved into the place of `Label-csv`, against the right edge.
+- **The csv and board buttons are the switch:** the csv button shows the table (and closes the board); closing the board
+  now shows the table when a label-csv is open, also when the template text was shown before (until now: back to what was
+  shown before). Without a csv, closing the board shows the text. Exactly one of the three buttons looks pressed.
+- The left column can be dragged narrower: its minimum is now 291 px at 100% (the logo + both buttons at their widest),
+  was 398 (save + two view buttons). Tooltip of the csv button in three languages; the board tooltip says "back to the table".
+- 234 tests (one new: the switch). Checked with the render program at 175% (table and board view); the README pictures
+  were rendered again.
+
 ## 1.2.0 — 2026-11-08 — board view, touch-sized Browse, ShowBoardByDefault, RowHeightCSV (Daan)
 
-- **Delivery:** `dist\v1.2.0\DssLabelTemplate.exe`, 53,934,090 bytes, file version 1.2.0.0, SHA-256
-  `d9c607865e485b9e7bc1b9c3abb027f7bceee76d099ec4855034612906304de2`. Built by `publish.cmd` after all 233 tests passed.
+- **Delivery (first build, replaced by the rebuild above):** 53,934,090 bytes, file version 1.2.0.0, SHA-256
+  `d9c607865e485b9e7bc1b9c3abb027f7bceee76d099ec4855034612906304de2`, now in `dist\_previous-builds\2026-11-08\v1.2.0\`.
+  Built by `publish.cmd` after all 233 tests passed.
   The exe was started once with a scratch data folder: window opened, data folder written (its README explains
   ShowBoardByDefault and RowHeightCSV). Known, not fixed: a csv column can cut a value of the same length as its longest
   one ("9…", see CLAUDE.md).

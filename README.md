@@ -26,8 +26,8 @@ all its labels:
   <img src="media/preview/MainUI-preview.png" width="720" alt="The DssLabelTemplate window in English: the template and label CSV at the top, the CSV data as a table on the left, and on the right the preview of label 3 of 13 with the small sheet map below it.">
 </p>
 
-The **board view** (button below the left column) shows the whole sheet with every label position; the label in the preview
-is highlighted, and tapping another label shows that one:
+The two buttons below the left column switch between the **CSV table** and the **board view**. The board shows the whole
+sheet with every label position; the label in the preview is highlighted, and tapping another label shows that one:
 
 <p align="center">
   <img src="media/preview/Board-preview.png" width="720" alt="The board view: the left column shows the whole sheet with all label positions, the shown label highlighted; the label preview on the right is bigger.">
