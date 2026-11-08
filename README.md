@@ -1,83 +1,99 @@
 <h1 align="center"><img src="media/header.png" width="540" alt="DssLabelTemplate - Visualize, edit and print label files for DUIVESTEIN"></h1>
 
-A small Windows tool to **visualize, edit and print label files for a Duivestein system**.
-Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (which writes the label CSV files for the Duivestein warehouse).
+**View, edit and reprint Duivestein label files.**
 
-- **One single `.exe`**, no installer, no .NET installation needed, no Excel/Office.
+DssLabelTemplate is a small Windows tool for the label files of a Duivestein warehouse: it shows every label as it will be
+printed, shows where it sits on the sheet, lets you edit the label layout, and reprints a damaged label at the unloading belt.
+Sister tool: **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (writes the label CSV files for the warehouse).
+
+> **Status:** version **1.2.0** (2026-11-08). Printing on the reprint printer (Zebra ZD220) works; real-world use at the
+> customer is going on. Full history: [CHANGELOG.md](CHANGELOG.md).
+
+## At a glance
+
+- **One file**, `DssLabelTemplate.exe`: no installer, no .NET installation, no Excel or Office. It lives in
+  `C:\DssLabelTemplate\`, together with `settings.json` and example label files.
+- **Made for a touch screen:** big buttons, a large label preview, and a board view where a tap on a label shows it.
+- **Dutch, French and English** interface.
+- Files are saved back in their own encoding and line endings; the label CSV itself is never changed.
+
+## What it looks like
+
+Left the data of the label CSV (or the template text), right the label as it will be printed, with below it the sheet and
+all its labels:
+
+<p align="center">
+  <img src="media/preview/MainUI-preview.png" width="720" alt="The DssLabelTemplate window in English: the template and label CSV at the top, the CSV data as a table on the left, and on the right the preview of label 3 of 13 with the small sheet map below it.">
+</p>
+
+The **board view** (button below the left column) shows the whole sheet with every label position; the label in the preview
+is highlighted, and tapping another label shows that one:
+
+<p align="center">
+  <img src="media/preview/Board-preview.png" width="720" alt="The board view: the left column shows the whole sheet with all label positions, the shown label highlighted; the label preview on the right is bigger.">
+</p>
+
+## What it does
+
 - Opens the two kinds of Duivestein label files (DSS Software Interface v1.7):
-  - a **label CSV + label template**: the CSV has one line per label (its place on the sheet and its data); the template
-    (XML) describes the layout of one label with variables like `$LENGTH$` that are filled in from each CSV line;
+  - a **label CSV + label template**: the CSV has one line per label (its place on the sheet and its data), the template
+    (XML) describes the layout with variables like `$LENGTH$` that are filled in from each line;
   - a **label XML**: one file per sheet with the layout and the data of all its labels.
-- Left: the XML in a coloured editor with line numbers (Scintilla, the editor of Notepad++), or the data of the label CSV
-  as a table. Right: a preview of one label, updated while typing, with arrows to go through all labels, where the label
-  sits on the sheet, and a small map of the sheet. The line between the two columns can be dragged.
-- **Printing** on any Windows printer, meant for a label printer at the unloading belt (Zebra ZD220) to **reprint a
-  damaged label**: the shown label, a range or all labels, one label per page, with real scannable QR codes and barcodes
-  whose bars fall on whole printer dots. The automatic printing on the label station stays with Duivestein's
-  DSSPrintServer.
-- Dutch, French and English interface. Files are saved back in their own encoding and line endings.
-- Installed by copying the exe to `C:\DssLabelTemplate`. That folder also holds `settings.json` and, from the first start,
-  the example files in `labels\` and `CSV examples\`.
+- **Edits** the XML in a coloured editor with line numbers (Scintilla, the editor of Notepad++); the preview follows while typing.
+- **Previews** each label at its real proportions, with arrows to go through all labels, its position and rotation on the
+  sheet, and a sheet map with the zero point of the warehouse.
+- **Reprints** a damaged label on any Windows printer (made for a Zebra ZD220): the shown label, a range or all labels, with
+  real scannable QR codes and barcodes. The automatic printing on the label station stays with Duivestein's DSSPrintServer.
 
-![The main window of DssLabelTemplate: the label files at the top, the template text on the left, the label preview on the right](media/Main-UI.png)
+## Main milestones
 
-## Status
+| Version | Date | |
+|---|---|---|
+| 1.0.0 | 2026-10-25 | First release: editor, label preview, both kinds of label files, program folder with examples |
+| 1.1.0 | 2026-10-25 | **Printing** for the reprint station, real QR codes, touch-friendly layout |
+| 1.1.2 | 2026-10-26 | Sheet map with the warehouse's zero point, turnable to the operator's view; big CSV files open much faster |
+| 1.1.3 – 1.1.4 | 2026-10-26 / 27 | Turned preview and print, printing without the Windows dialog, CSV columns in your own order |
+| 1.1.5 | 2026-11-08 | `settings.json` can be edited while the program runs (see below) |
+| 1.2.0 | 2026-11-08 | **Board view** with tap-to-show, bigger touch buttons, adjustable CSV table size |
 
-| Part | State |
+## Settings that are only in `settings.json`
+
+The language and the label size are set in the window. Other settings are only in `C:\DssLabelTemplate\settings.json`:
+**Shift+click on the ROGIERS logo** (bottom left of the window) opens it in Notepad. A saved change is used as soon as you
+click back into the window, and is never overwritten by the program. The `README.md` in that folder explains each one.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `PrinterName` | empty | The printer to use; empty = the default Windows printer |
+| `HideWindowsPrintDialog` | `false` | `true` = the print button prints the shown label at once, without the Windows dialog |
+| `ShowBoardByDefault` | `false` | `true` = every opened file is shown on the board |
+| `RowHeightCSV` | `100` | Size of the text and rows of the CSV table, in percent (50 – 300) |
+| `SheetReferenceCorner` | `Linksonder` | The corner the label positions are measured from; must match TsDssConverter and DSSClient |
+| `SheetRotationInViewer` | `0` | Turns the sheet map to how the operator sees the sheet (0, 90, 180, 270 or negative) |
+| `ShowLabelRotation` | `false` | `true` = the preview shows the label turned as it sits on the sheet |
+| `PrintLabelWithRotation` | `false` | `true` = the print is turned the same way (square labels only) |
+| `LabelDirection` | `CCW` | Which way a positive rotation turns: `CCW` or `CW` |
+
+## Good to know
+
+- The label size is not in the label files: it is set in the window (two fields above the preview).
+- Barcodes are always printed as Code 128, whatever type the template names. QR codes are real and scannable.
+- The paper size of the label printer is set in its driver (Windows settings); the program warns when it does not match.
+  On the Zebra ZD220, switch dithering OFF in the driver.
+
+## Open points
+
+| From | Question |
 |---|---|
-| Window, file selection, text editor, open / save | Done (0.1.0, checked) |
-| Both kinds of label files; label preview with arrows | Done (0.2.0) |
-| Label size fields (length × width in mm, default 100 × 100); objects outside the label are flagged in color red | Done (0.3.0) |
-| Program folder `C:\DssLabelTemplate` with examples; separate file lines for template and CSV; Tab order | Done (0.5.0, checked) |
-| **First release** | **1.0.0** |
-| Print button (reprint on a Zebra ZD220), real QR codes, draggable column divider, new banner text, touch-friendly layout | Done (1.1.0); printing on the ZD220 works with dithering OFF in the driver (tested 2026-10-27) |
-| Window size / position / maximised and column divider remembered; label CSV shown as a table first | Done (1.1.1, published) |
-| Sheet map can be turned (`SheetRotationInViewer` in `settings.json`), for a label PC on a turnable console | Done (1.1.2) |
-| File description moved into "?" icons (hover or tap) and one divider removed: more height for the editor and preview | Done (1.1.2) |
-| Big label CSV files open about 3 x faster, with a gray "loading" layer that blocks clicks meanwhile; wider arrow and print buttons (counter left, print right) | Done (1.1.2) |
-| Zero-point dot on the sheet map; reference corner (`SheetReferenceCorner` in `settings.json`) matching TsDssConverter / DSSClient | Done (1.1.2 rebuild) |
-| Preview 60 % label / 40 % sheet map; `ShowLabelRotation` and `PrintLabelWithRotation` in `settings.json` (turned preview / turned print of a square label) | Done (1.1.3) |
-| Turned preview and print follow the operator's view (rotation + `SheetRotationInViewer`); `LabelDirection` (`CCW` / `CW`) in `settings.json` | Done (1.1.4) |
-| `HideWindowsPrintDialog` in `settings.json`: print the shown label without the Windows dialog | Done (1.1.4 rebuild) |
-| Columns of the label CSV table can be dragged into another order, kept in `settings.json` (`CsvColumnOrder`); the CSV file is not changed | Done (1.1.4 rebuild) |
-| Banner 15% smaller (the same as TsDssConverter); **Shift+click on the ROGIERS logo** opens `settings.json` in Notepad (a normal click still opens the website); a hand edit is used as soon as you click back into the window and is no longer overwritten when the program saves; a file with a mistake is never overwritten | Done (1.1.5) |
-| **View board** button below the left column: the left column shows the whole sheet with all label positions (the shown label highlighted), the label preview gets bigger, and tapping a label on the board shows it (touch screen); click the button again to go back. The label counter is 1.5 x bigger. `ShowBoardByDefault` in `settings.json` opens every file on the board. The two Browse buttons and path boxes are higher (44 px) for touch. `RowHeightCSV` in `settings.json` makes the text and rows of the CSV table bigger (percent) | Done (1.2.0) |
+| Customer | The real label size and a printed label to compare the preview with (position point, rotation direction) |
+| Duivestein | The real label templates of the working system |
+| Reprint station | Scanning the printed QR code and barcode with the real scanner |
 
-Third-party components: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence) and
-[QRCoder](https://github.com/Shane32/QRCoder) (MIT licence).
+## Technology
 
-## Remarks
+C# on .NET 10 with Windows Forms; [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence)
+for the editor and [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence) for the QR codes. 233 automated tests (xUnit).
 
-1. The preview follows Duivestein's manual. The label size is not in the label files, so it is set in the window.
-2. The preview assumes (to be checked on a printed label): rotation counter-clockwise, text positioned by
-its top-left corner.
-3. QR codes are real and scannable. Barcodes are always printed as Code 128, whatever type the template names (EAN,
-   Code 39, … are not built in).
-4. The printer's paper size is set in the printer driver (Windows settings) to the label size; the program warns when
-   it does not match the label size in the window.
-5. The small sheet map below the label can be turned to match how the operator sees the sheet on the machine:
-   `"SheetRotationInViewer": 90` in `settings.json` (0, 90, 180, 270 or the negative ones; positive = counter-clockwise).
-   This setting is only in the file, not in the window.
-6. A round dot on the sheet map marks the corner the label X / Y are measured from. Set that corner with
-   `"SheetReferenceCorner": "Linksonder"` in `settings.json` (`Linksonder`, `Linksboven`, `Rechtsonder` or `Rechtsboven`,
-   DSSClient's own names; only in the file). It must be the same corner as TsDssConverter's zero-point drop-down
-   (= DSSClient's "Oriëntatie"), otherwise the sheet map shows the labels mirrored.
-7. `"ShowLabelRotation": true` in `settings.json` turns the label PREVIEW by the label's rotation from the CSV (the way of
-   `"LabelDirection": "CCW"` or `"CW"`, default CCW) plus `SheetRotationInViewer`, as the operator sees the label on the sheet; `"PrintLabelWithRotation": true`
-   turns the PRINT the same way, around the middle of the label, so the operator can stick it on without turning it. Printing
-   turned only works for a square label (length = width); for other sizes the program asks whether to print upright. Both are
-   off by default and only in the file.
-8. `"HideWindowsPrintDialog": true` in `settings.json` skips the Windows print dialog: the print button prints the shown label
-   at once on `PrinterName` (if filled in and installed) or the default Windows printer, with the driver's own settings.
-   Off by default and only in the file.
-9. The columns of the label CSV table can be dragged into another order (drag a column title). The order is kept in
-   `settings.json` (`CsvColumnOrder`) and used for every CSV that is opened; the label number stays first. Only the view:
-   the CSV file itself is never changed.
+## Credits
 
-## Open questions
-
-1. The real label size (mm) and a printed label to compare the preview with. Real-life printed labels can also determine if the label preview is rendered correctly.
-2. Real templates, to be copied from a working Duivestein system later.
-3. Printing on the Zebra ZD220 works (dithering OFF in the printer driver, tested 2026-10-27). Still open: scanning the QR code and barcode with the real scanner.
-
-Developer: Daan Verhoost — ROGIERS NV/SA.
+Developed by Daan Verhoost, together with my best friend Claude AI for [ROGIERS NV/SA](https://www.rogiers.be/).
