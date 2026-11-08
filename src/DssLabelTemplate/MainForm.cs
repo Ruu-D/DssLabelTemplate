@@ -22,23 +22,28 @@ internal class MainForm : Form
     private readonly Action<AppSettings> _saveSettings;
     private readonly string? _fileToOpen;
     private readonly string? _dataFolder; // C:\DssLabelTemplate: the Browse dialogs start in its example folders
+    private DateTime _settingsFileTime;   // the date of settings.json when it was last read (see OnActivated)
 
-    // The banner picture is 540 x 84 pixels. It is shown 1.2 times as big (the same as TsDssConverter).
-    private const int BannerWidth = 648;
-    private const int BannerHeight = 101;
+    // The banner picture is 540 x 84 pixels. It is shown 1.02 times as big (the same as TsDssConverter): 15% smaller than
+    // the 648 x 101 of before (Daan, 2026-11-08). Keep the 540:84 proportions, otherwise blue bars appear.
+    private const int BannerWidth = 551;
+    private const int BannerHeight = 86;
 
     // The size of the window when it opens, at 100% (the same as the settings window of TsDssConverter).
     private const int WindowWidth = 940;
     private const int WindowHeight = 780;
 
-    // All buttons have exactly this size (at 100%), so they line up and look the same.
-    private static readonly Size ButtonSize = new(100, 28);
+    // The two Browse buttons and the path boxes next to them (Daan, 2026-11-08, "option A"): they are used a lot on the
+    // touch screen, so 44 high (about 1 cm, the usual smallest size for a finger; was 100 x 28 like the normal buttons).
+    private static readonly Size FileButtonSize = new(120, 44);
 
     // The two arrows and the print button below the preview: twice the size of the 36 x 28 they had next to the title
     // (Daan, 2026-10-25: easier to hit at the reprint station). This is their SMALLEST size: they grow with the preview
     // column up to NavigationButtonMaximumWidth (Daan, 2026-10-26: wider arrows, print as wide; FitNavigationButtons).
     private static readonly Size NavigationButtonSize = new(72, 56);
     private const int NavigationButtonMaximumWidth = 120;
+    private const int NavigationButtonSmallestWidth = 44; // only with the preview column dragged very narrow and a long counter
+    private const float CounterFontFactor = 1.5f;         // the "2 / 3" below the preview: 1.5 x the window's font (Daan, 2026-11-08)
     private const int NavigationSideRoom = 12; // at least this much room between an arrow and the counter or print
 
     // Dragging the vertical line: the preview column keeps at least this width (at 100%), so the label size still fits
@@ -106,6 +111,8 @@ internal class MainForm : Form
     internal readonly RoundedButton PreviousButton = new();
     internal readonly RoundedButton NextButton = new();
     internal readonly RoundedButton PrintButton = new(); // right of the arrows: prints the shown label (or more)
+    internal readonly RoundedButton BoardButton = new(); // left of the arrows: shows the board in the left column (a toggle)
+    internal readonly SheetBoard Board;                  // the board view: the sheet with all label positions, big
     internal readonly TableLayoutPanel PreviewHeader = new(); // the preview title with the label size
     internal readonly TableLayoutPanel PreviewNavigation = new(); // below the preview: the counter, the arrows and print
     internal readonly XmlEditor Editor = new();
@@ -131,6 +138,7 @@ internal class MainForm : Form
     private bool _isLabelXml;           // the editor holds a valid label-xml: then a label-csv is not used
     private Control? _fileRow;          // the rows with the path boxes: the texts above and below get their width (FitFileTexts)
     private bool _showingCsv;           // the left column shows the csv table instead of the template text
+    private bool _showingBoard;         // the left column shows the board (over the text or the table, which stays chosen)
     private bool _selectingCsvRow;      // the program (not the user) selects a row of the csv table
     private bool _fillingCsvGrid;       // the program (not the operator) adds and orders the columns of the csv table
     private bool _csvColumnOrderSavePending; // a dragged column order will be saved right after the drop
@@ -140,6 +148,9 @@ internal class MainForm : Form
 
     /// <summary>Internal: true when the left column shows the csv table.</summary>
     internal bool ShowingCsv => _showingCsv;
+
+    /// <summary>Internal: true when the left column shows the board.</summary>
+    internal bool ShowingBoard => _showingBoard;
 
     /// <summary>Internal: the label-csv that goes with the template, or null.</summary>
     internal string? CurrentCsvFile => _csv?.FilePath;
@@ -172,6 +183,11 @@ internal class MainForm : Form
         _saveSettings = saveSettings;
         _fileToOpen = fileToOpen;
         _dataFolder = dataFolder;
+        Board = new SheetBoard(Preview); // the board draws what the preview knows
+
+        // The settings were just read from settings.json: a later change of the file is noticed in OnActivated.
+        string? settingsFile = SettingsFilePath;
+        _settingsFileTime = settingsFile != null && File.Exists(settingsFile) ? File.GetLastWriteTimeUtc(settingsFile) : DateTime.MinValue;
 
         // Like a form made with the Visual Studio designer: build everything between SuspendLayout and
         // ResumeLayout. WinForms applies the automatic scaling (for 125%, 150%, ...) when the layout resumes.
@@ -187,10 +203,7 @@ internal class MainForm : Form
         LabelLengthBox.Text = LabelXml.Format(_settings.LabelLength);
         LabelWidthBox.Text = LabelXml.Format(_settings.LabelWidth);
         Preview.LabelSize = new SizeF((float)_settings.LabelLength, (float)_settings.LabelWidth);
-        Preview.SheetRotation = _settings.SheetRotationInViewer; // only in settings.json, not in the window
-        Preview.ReferenceCorner = SheetCorners.Parse(_settings.SheetReferenceCorner) ?? SheetCorner.BottomLeft; // the same
-        Preview.ShowRotation = _settings.ShowLabelRotation; // the same
-        Preview.RotationClockwise = _settings.LabelRotationIsClockwise; // the same
+        ApplyHandEditedSettings(); // the settings that are only in settings.json, not in the window
         LabelLengthBox.TextChanged += (sender, e) => OnLabelSizeChanged(LabelLengthBox);
         LabelWidthBox.TextChanged += (sender, e) => OnLabelSizeChanged(LabelWidthBox);
 
@@ -585,11 +598,12 @@ internal class MainForm : Form
         caption.Margin = new Padding(0, top, 8, 0);
         caption.ForeColor = Theme.Navy;
 
-        // The text box sits in a rounded frame that is as high as the button, so both line up.
+        // The text box sits in a rounded frame that is as high as the Browse button, so both line up (the text in the
+        // middle of the frame's height).
         box.ForeColor = Theme.Navy;
         var frame = new TextBoxFrame(box)
         {
-            Height = ButtonSize.Height,
+            Height = FileButtonSize.Height,
             Anchor = AnchorStyles.Left | AnchorStyles.Right,
             Margin = new Padding(0, top, 8, 0),
         };
@@ -602,7 +616,7 @@ internal class MainForm : Form
             }
         };
 
-        browse.Size = ButtonSize;
+        browse.Size = FileButtonSize;
         browse.Margin = new Padding(0, top, 0, 0);
         Theme.StyleSecondaryButton(browse);
         browse.Click += (sender, e) => openBrowsed();
@@ -631,6 +645,14 @@ internal class MainForm : Form
         EditorArea.Margin = new Padding(0);
         EditorArea.Controls.Add(new ContentFrame(CsvGrid) { Dock = DockStyle.Fill, Visible = false });
         EditorArea.Controls.Add(new ContentFrame(Editor) { Dock = DockStyle.Fill, FillColor = Theme.XmlBackground }); // no white ring around the grey editor
+
+        // The board: its own frame, like the preview (no ContentFrame around it).
+        Board.Dock = DockStyle.Fill;
+        Board.Margin = new Padding(0);
+        Board.BackColor = Theme.White;
+        Board.Visible = false;
+        Board.LabelChosen += ShowLabel; // a tapped label is shown in the preview
+        EditorArea.Controls.Add(Board);
 
         Preview.Dock = DockStyle.Fill;
         Preview.Margin = new Padding(0);
@@ -667,8 +689,8 @@ internal class MainForm : Form
         Workspace.Controls.Add(EditorArea, 0, 1);
         Workspace.Controls.Add(ColumnDivider, 1, 1);
         Workspace.Controls.Add(Preview, 2, 1);
-        Workspace.Controls.Add(BuildLogo(), 0, 2);
-        Workspace.Controls.Add(BuildPreviewNavigation(), 2, 2);
+        Workspace.Controls.Add(BuildPreviewNavigation(), 2, 2); // first: the left row takes its height from it
+        Workspace.Controls.Add(BuildLeftBottomRow(), 0, 2);
         return Workspace;
     }
 
@@ -746,8 +768,9 @@ internal class MainForm : Form
         XmlViewButton.Margin = new Padding(0, 0, 4, 0);
         CsvViewButton.Size = ViewButtonSize;
         CsvViewButton.Margin = new Padding(0);
-        XmlViewButton.Click += (sender, e) => ShowCsvView(false);
-        CsvViewButton.Click += (sender, e) => ShowCsvView(true);
+        // These two also close the board: the user chose what the left column must show.
+        XmlViewButton.Click += (sender, e) => { _showingBoard = false; ShowCsvView(false); };
+        CsvViewButton.Click += (sender, e) => { _showingBoard = false; ShowCsvView(true); };
 
         EditorHeader.ColumnCount = 4;
         EditorHeader.RowCount = 1;
@@ -812,7 +835,9 @@ internal class MainForm : Form
 
         // Bigger than the rest of the window, for a touch screen (Daan, 2026-10-25): the font 4 points bigger, and the rows
         // higher than the text (FillCsvGrid). The control's own Font, so WinForms scales it with the screen like the others.
-        CsvGrid.Font = new Font(Font.FontFamily, Font.SizeInPoints + CsvExtraPoints, FontStyle.Regular, GraphicsUnit.Point);
+        // Both times RowHeightCSV percent (settings.json, Daan 2026-11-08; 100 = this standard).
+        float points = (Font.SizeInPoints + CsvExtraPoints) * _settings.RowHeightCSV / 100f;
+        CsvGrid.Font = new Font(Font.FontFamily, points, FontStyle.Regular, GraphicsUnit.Point);
 
         // The headers in the colours of the theme (otherwise Windows draws them in its own grey).
         CsvGrid.EnableHeadersVisualStyles = false;
@@ -829,6 +854,30 @@ internal class MainForm : Form
         CsvGrid.CurrentCellChanged += (sender, e) => OnCsvRowChosen(); // after the current row has changed (SelectionChanged comes too early)
     }
 
+    /// <summary>The height of a row of the csv table: its text plus room above and below, both RowHeightCSV percent.</summary>
+    private int CsvRowHeight() =>
+        CsvGrid.Font.Height + LogicalToDeviceUnits((int)Math.Round(CsvRowExtraHeight * _settings.RowHeightCSV / 100.0));
+
+    /// <summary>
+    /// RowHeightCSV was changed in settings.json while the program runs: the text and the rows of the csv table get the
+    /// new size at once. The font is changed in proportion to the one it has now, so the screen scaling stays in it.
+    /// </summary>
+    private void ResizeCsvTable(int oldPercent)
+    {
+        float points = CsvGrid.Font.SizeInPoints * _settings.RowHeightCSV / oldPercent;
+        CsvGrid.Font = new Font(CsvGrid.Font.FontFamily, points, FontStyle.Regular, GraphicsUnit.Point); // the columns follow (FontChanged)
+        CsvGrid.ColumnHeadersDefaultCellStyle.Font = new Font(CsvGrid.Font, FontStyle.Bold);
+
+        int height = CsvRowHeight();
+        CsvGrid.RowTemplate.Height = height;
+        foreach (DataGridViewRow row in CsvGrid.Rows)
+        {
+            row.Height = height;
+        }
+
+        FitCsvColumns(); // also for the bold titles
+    }
+
     /// <summary>Fills the csv table with the label-csv (or empties it). The columns keep the order of the file.</summary>
     private void FillCsvGrid(LabelCsv? csv)
     {
@@ -838,7 +887,7 @@ internal class MainForm : Form
 
         // Room above and below the text of every row, easy to tap on a touch screen. Set here (not when the table is
         // built) because the font height in pixels is only right once the window is on its screen.
-        CsvGrid.RowTemplate.Height = CsvGrid.Font.Height + LogicalToDeviceUnits(CsvRowExtraHeight);
+        CsvGrid.RowTemplate.Height = CsvRowHeight();
 
         if (csv != null)
         {
@@ -973,20 +1022,49 @@ internal class MainForm : Form
         }
     }
 
-    /// <summary>Shows the template text (false) or the csv table (true) in the left column.</summary>
+    /// <summary>
+    /// Chooses the template text (false) or the csv table (true) for the left column. While the board is shown it stays
+    /// on top: the choice is used when the board is closed (opening another csv does not close the board).
+    /// </summary>
     internal void ShowCsvView(bool csv)
     {
         _showingCsv = csv && _csv != null;
-        Editor.Parent!.Visible = !_showingCsv;
-        CsvGrid.Parent!.Visible = _showingCsv;
-        Theme.StyleToggleButton(XmlViewButton, selected: !_showingCsv);
-        Theme.StyleToggleButton(CsvViewButton, selected: _showingCsv);
-        EditorCaption.Text = _showingCsv ? Strings.CsvCaption : Strings.EditorCaption;
-        if (_showingCsv)
+        ShowLeftColumn();
+    }
+
+    /// <summary>
+    /// The "View board" button (Daan, 2026-11-08): true = the left column shows the board, the sheet with all label
+    /// positions (<see cref="SheetBoard"/>); false = back to the text or table it showed before. Only when the shown label
+    /// knows its sheet.
+    /// </summary>
+    internal void ShowBoard(bool board)
+    {
+        _showingBoard = board && Preview.ShownLabelHasSheet;
+        ShowLeftColumn();
+    }
+
+    /// <summary>Shows what was chosen in the left column, and marks the buttons that chose it.</summary>
+    private void ShowLeftColumn()
+    {
+        Board.Visible = _showingBoard;
+        Editor.Parent!.Visible = !_showingBoard && !_showingCsv;
+        CsvGrid.Parent!.Visible = !_showingBoard && _showingCsv;
+
+        // While the board is shown, the board button is the selected one ("pressed", in the brand colour) and the two
+        // view buttons above the column are both not.
+        Theme.StyleToggleButton(XmlViewButton, selected: !_showingBoard && !_showingCsv);
+        Theme.StyleToggleButton(CsvViewButton, selected: !_showingBoard && _showingCsv);
+        Theme.StyleToggleButton(BoardButton, selected: _showingBoard);
+        Preview.ShowSheetMap = !_showingBoard; // the board shows the sheet big: the small map goes, the label gets its room
+        EditorCaption.Text = LeftColumnCaption();
+        if (_showingCsv && !_showingBoard)
         {
             SelectCsvRowOfShownLabel(); // the row of the label in the preview
         }
     }
+
+    private string LeftColumnCaption() =>
+        _showingBoard ? Strings.BoardCaption : _showingCsv ? Strings.CsvCaption : Strings.EditorCaption;
 
     /// <summary>The user clicked a row of the csv table: show the (first) label of that csv line.</summary>
     private void OnCsvRowChosen()
@@ -1057,7 +1135,8 @@ internal class MainForm : Form
         LabelCounter.Anchor = AnchorStyles.Left;
         LabelCounter.Margin = new Padding(0);
         LabelCounter.ForeColor = Theme.Navy;
-        LabelCounter.Font = new Font(Font, FontStyle.Bold); // Daan, 2026-10-26: easier to read at the reprint station
+        // Bold (Daan, 2026-10-26) and 1.5 x the window's font (Daan, 2026-11-08): easier to read at the reprint station.
+        LabelCounter.Font = new Font(Font.FontFamily, Font.SizeInPoints * CounterFontFactor, FontStyle.Bold, GraphicsUnit.Point);
 
         // The arrow signs twice as big too, to fit the bigger buttons.
         var arrowFont = new Font(Font.FontFamily, Font.SizeInPoints * 2, FontStyle.Regular, GraphicsUnit.Point);
@@ -1109,22 +1188,37 @@ internal class MainForm : Form
     }
 
     /// <summary>
-    /// The arrows and print get the same width: as wide as fits in the row below the preview (four button widths, the
-    /// room between the arrows and room on both sides of them), at least the 72 they always had and at most 120 (at 100%).
-    /// Called when the row changes width (the window, the column line).
+    /// The arrows, print and the board button (below the left column) get the same width: as wide as fits in the row below
+    /// the preview, at most 120 (at 100%). That row = 4 button widths + the gap between the arrows + room on both sides
+    /// (as before 2026-11-08), and the half left of the arrows must also hold the (bigger) counter. Narrower than 72 only
+    /// when the preview column is dragged very narrow with a long counter, down to <see cref="NavigationButtonSmallestWidth"/>.
+    /// Called when the row changes width (the window, the column line) and when another file is opened (the counter).
     /// </summary>
     private void FitNavigationButtons()
     {
-        int room = PreviewNavigation.Width - PreviousButton.Margin.Right - 2 * LogicalToDeviceUnits(NavigationSideRoom);
-        int width = Math.Max(LogicalToDeviceUnits(NavigationButtonSize.Width),
-                             Math.Min(LogicalToDeviceUnits(NavigationButtonMaximumWidth), room / 4));
-        foreach (RoundedButton button in new[] { PreviousButton, NextButton, PrintButton })
+        int sideRoom = LogicalToDeviceUnits(NavigationSideRoom);
+        int rowWidth = PreviewNavigation.Width - PreviousButton.Margin.Right;
+        int fits = Math.Min((rowWidth - 2 * sideRoom) / 4,                  // the four widths and room on both sides
+                            rowWidth / 2 - CounterWidthNeeded() - sideRoom); // the counter beside the left arrow
+        int width = Math.Max(LogicalToDeviceUnits(NavigationButtonSmallestWidth),
+                             Math.Min(LogicalToDeviceUnits(NavigationButtonMaximumWidth), fits));
+        foreach (RoundedButton button in new[] { BoardButton, PreviousButton, NextButton, PrintButton })
         {
             if (button.Width != width) // also stops the loop: a new width lays the row out again
             {
                 button.Width = width;
             }
         }
+    }
+
+    /// <summary>
+    /// The width of the widest counter of the open file ("88 / 88" for 10 – 99 labels): the buttons do not change width
+    /// while going through the labels, only when a file with more or fewer digits is opened.
+    /// </summary>
+    private int CounterWidthNeeded()
+    {
+        string digits = new('8', Math.Max(1, Preview.Count).ToString(System.Globalization.CultureInfo.InvariantCulture).Length);
+        return TextRenderer.MeasureText(digits + " / " + digits, LabelCounter.Font).Width;
     }
 
     /// <summary>The company logo at the bottom left of the window (below the editor), opens rogiers.be.</summary>
@@ -1138,8 +1232,159 @@ internal class MainForm : Form
         LogoPicture.Margin = new Padding(0);
         LogoPicture.Cursor = Cursors.Hand;
         _toolTip.SetToolTip(LogoPicture, Strings.CompanyName);
-        LogoPicture.Click += (sender, e) => OpenWebsite(Strings.CompanyUrl);
+        LogoPicture.Click += (sender, e) => LogoClicked(shiftDown: (ModifierKeys & Keys.Shift) == Keys.Shift);
         return LogoPicture;
+    }
+
+    /// <summary>
+    /// The last row below the LEFT column: the logo at the left and, against the vertical line (Daan, 2026-11-08), the
+    /// board button — below the column it changes, and just left of the counter below the preview. Not AutoSize: as wide
+    /// as the column and as high as the row below the preview (20 px room + a big button), so the bottoms line up.
+    /// </summary>
+    private Control BuildLeftBottomRow()
+    {
+        BoardButton.Size = NavigationButtonSize;
+        BoardButton.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
+        BoardButton.Margin = new Padding(0);
+        BoardButton.Image = AppIcons.Board();
+        BoardButton.IconHeight = 2 * RoundedButton.DefaultIconHeight;
+        BoardButton.TabStop = false; // like print: Tab only goes through the four fields
+        BoardButton.Visible = false; // only when the labels know their sheet (UpdateNavigation)
+        Theme.StyleToggleButton(BoardButton, selected: false);
+        BoardButton.Click += (sender, e) => ShowBoard(!_showingBoard);
+
+        var row = new TableLayoutPanel
+        {
+            ColumnCount = 2,
+            RowCount = 1,
+            AutoSize = false,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
+            Margin = new Padding(0),
+            Height = PreviewNavigation.Margin.Top + NavigationButtonSize.Height,
+        };
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        row.Controls.Add(BuildLogo(), 0, 0);
+        row.Controls.Add(BoardButton, 1, 0);
+        return row;
+    }
+
+    /// <summary>
+    /// A click on the logo opens the website. Shift+click opens settings.json in Notepad instead (Daan, 2026-11-08): a
+    /// hidden way in for whoever maintains the program, because several settings are only in that file. It is not shown
+    /// anywhere on purpose. A change in the file is used when the window is active again (<see cref="OnActivated"/>).
+    /// </summary>
+    internal void LogoClicked(bool shiftDown)
+    {
+        if (!shiftDown)
+        {
+            OpenWebsite(Strings.CompanyUrl);
+            return;
+        }
+
+        string? path = SettingsFilePath;
+        if (path == null)
+        {
+            return; // tests: no data folder
+        }
+
+        try
+        {
+            if (!File.Exists(path))
+            {
+                SettingsStore.Save(path, _settings); // someone deleted it: write the settings in use, so there is something to edit
+            }
+
+            // Always Notepad: Windows often has no program for .json, or opens it in a browser where it cannot be edited.
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe") { ArgumentList = { path }, UseShellExecute = false });
+        }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception || error is IOException || error is UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, Strings.CannotOpenFile(error.Message), Strings.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    /// <summary>C:\DssLabelTemplate\settings.json; null when the window has no data folder (the tests).</summary>
+    private string? SettingsFilePath => _dataFolder == null ? null : AppDataFolder.SettingsFile(_dataFolder);
+
+    /// <summary>
+    /// The window became active again (for example after editing settings.json in Notepad): when the file changed, the
+    /// settings that are only in that file are read again and used at once. The settings of the window itself stay as
+    /// they are (the window wins for those, see <see cref="SettingsStore.SaveKeepingHandEdits"/>).
+    /// </summary>
+    protected override void OnActivated(EventArgs e)
+    {
+        base.OnActivated(e);
+
+        string? path = SettingsFilePath;
+        if (path == null)
+        {
+            return;
+        }
+
+        DateTime time;
+        try
+        {
+            time = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
+        }
+        catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+        {
+            return; // cannot look now: act as if nothing changed
+        }
+
+        if (time == _settingsFileTime)
+        {
+            return; // nothing changed since the last look
+        }
+
+        SettingsReadResult read = SettingsStore.Read(path);
+        if (!read.FileExisted || read.ErrorIsTemporary)
+        {
+            return; // gone (the settings in use stay), or busy being written: look again the next time
+        }
+
+        _settingsFileTime = time;
+
+        if (read.Error != "")
+        {
+            // Once per change of the file; after the activation itself, so the message box does not disturb it.
+            BeginInvoke(() => MessageBox.Show(this, Strings.SettingsFileHasMistake(path, read.Error), Strings.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning));
+            return;
+        }
+
+        UseHandEditedSettings(read.Settings);
+    }
+
+    /// <summary>
+    /// Uses the settings that are only in settings.json from <paramref name="file"/>: the sheet map, the label rotation in
+    /// the preview and the print button. Returns false when they are the same as the ones in use (nothing to do).
+    /// </summary>
+    internal bool UseHandEditedSettings(AppSettings file)
+    {
+        if (_settings.HasSameHandEditedSettings(file))
+        {
+            return false;
+        }
+
+        int oldCsvRowSize = _settings.RowHeightCSV;
+        _settings.CopyHandEditedSettingsFrom(file);
+        ApplyHandEditedSettings();
+        if (_settings.RowHeightCSV != oldCsvRowSize)
+        {
+            ResizeCsvTable(oldCsvRowSize);
+        }
+        ApplyTexts(); // the tooltip of the print button depends on HideWindowsPrintDialog; refreshes the preview too
+        return true;
+    }
+
+    /// <summary>Gives the preview the settings that are only in settings.json.</summary>
+    private void ApplyHandEditedSettings()
+    {
+        Preview.SheetRotation = _settings.SheetRotationInViewer;
+        Preview.ReferenceCorner = SheetCorners.Parse(_settings.SheetReferenceCorner) ?? SheetCorner.BottomLeft;
+        Preview.ShowRotation = _settings.ShowLabelRotation;
+        Preview.RotationClockwise = _settings.LabelRotationIsClockwise;
     }
 
     /// <summary>A thin horizontal line over the full width, in the pale blue of the theme.</summary>
@@ -1172,7 +1417,7 @@ internal class MainForm : Form
         CsvFileCaption.Text = Strings.CsvFileCaption;
         XmlBrowseButton.Text = Strings.Browse;
         CsvBrowseButton.Text = Strings.Browse;
-        EditorCaption.Text = _showingCsv ? Strings.CsvCaption : Strings.EditorCaption;
+        EditorCaption.Text = LeftColumnCaption();
         XmlViewButton.Text = Strings.XmlViewButton;
         CsvViewButton.Text = Strings.CsvViewButton;
         PreviewCaption.Text = Strings.PreviewCaption;
@@ -1184,6 +1429,8 @@ internal class MainForm : Form
         string printTooltip = _settings.HideWindowsPrintDialog ? Strings.PrintTooltipWithoutDialog : Strings.PrintTooltip;
         _toolTip.SetToolTip(PrintButton, printTooltip);
         PrintButton.AccessibleName = printTooltip; // the button has a picture, no text: for a screen reader
+        _toolTip.SetToolTip(BoardButton, Strings.BoardTooltip);
+        BoardButton.AccessibleName = Strings.BoardTooltip;
         _toolTip.SetToolTip(ColumnDivider, Strings.ColumnDividerTooltip);
         SaveButton.Text = Strings.SaveTemplate;
         FitFileTexts(); // the description has another length in another language
@@ -1590,6 +1837,13 @@ internal class MainForm : Form
         UpdateCsvLine();
         UpdateNavigation();
         UpdateFileStatus(labels);
+
+        // ShowBoardByDefault (settings.json, Daan 2026-11-08): every newly opened file (also the ones opened again at the
+        // start) is shown on the board, when its labels know their sheet. Closing the board stays possible.
+        if (newFile && _settings.ShowBoardByDefault && Preview.ShownLabelHasSheet)
+        {
+            ShowBoard(true);
+        }
     }
 
     /// <summary>
@@ -1638,6 +1892,16 @@ internal class MainForm : Form
         {
             ShowCsvView(false);
         }
+
+        // The board button: only when the labels know their sheet; a file without one closes the board.
+        bool board = Preview.ShownLabelHasSheet;
+        BoardButton.Visible = board;
+        if (!board && _showingBoard)
+        {
+            ShowBoard(false);
+        }
+
+        FitNavigationButtons(); // the counter of another file may need more room
 
         SelectCsvRowOfShownLabel();
     }

@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.2.0 — 2026-11-08 — board view, touch-sized Browse, ShowBoardByDefault, RowHeightCSV (Daan)
+
+- **Delivery:** `dist\v1.2.0\DssLabelTemplate.exe`, 53,934,090 bytes, file version 1.2.0.0, SHA-256
+  `d9c607865e485b9e7bc1b9c3abb027f7bceee76d099ec4855034612906304de2`. Built by `publish.cmd` after all 233 tests passed.
+  The exe was started once with a scratch data folder: window opened, data folder written (its README explains
+  ShowBoardByDefault and RowHeightCSV). Known, not fixed: a csv column can cut a value of the same length as its longest
+  one ("9…", see CLAUDE.md).
+
+- **"View board" button** below the left column, against the vertical line, so just left of the label counter
+  (`BoardButton`, icon `media\Board.png`, the same size as the arrows; first placed between the counter and the left arrow,
+  moved the same day on Daan's request). A toggle: pressed (brand colour, like the chosen Template / Label-csv button) the LEFT column shows the
+  board, the sheet seen from above with ONLY the label positions, as big as the column allows, on the same pale blue panel
+  as the preview (`SheetBoard.cs`); pressed again it goes back to the text or table of before. The board is the small sheet
+  map of the preview made big: the drawing code was made shared (`LabelPreview.DrawSheetMap`, `DrawPanel`), so it follows the
+  same reference corner, sheet turn and label size, and the label of the preview is the one in the brand colour. Only when
+  the shown label knows its sheet; the Template / Label-csv buttons close it.
+- **While the board is shown the small sheet map below the label is left out** (`LabelPreview.ShowSheetMap`): the label in
+  the preview gets that room and is shown bigger.
+- **Tap a label on the board to show it** (touch screen): `SheetBoard` reacts on the finger going down; the same squares as
+  drawn (`LabelPreview.LabelSquares` / `FindLabelAt`), a tap up to 16 px (at 100%) beside a small square still counts, of
+  several the nearest wins. Hand cursor over the board.
+- **The label counter ("3 / 12") is 1.5 x bigger** (bold, 13.5 pt instead of 9). The width rule of the buttons now also
+  keeps room for the widest counter of the file (`CounterWidthNeeded`); in a very narrow preview with a long counter the
+  buttons may get narrower than 72, down to 44.
+- **`ShowBoardByDefault` in settings.json** (true / false, default false; only in the file): every newly opened file (also
+  the ones opened again at the start) is shown on the board when its labels know their sheet. A hand-edited setting like
+  the others (kept when the program saves, read again on Activated; used from the next opened file). Explained in
+  `program-folder\README.md`.
+- **Touch-sized Browse buttons** (Daan, "option A"): both Browse buttons 120 x 44 at 100% (`FileButtonSize`, were
+  100 x 28) and the two path boxes just as high, so each file line stays in line; row 1 is about 32 px higher, taken from
+  the editor and the preview. The now unused `ButtonSize` was removed.
+- **`RowHeightCSV` in settings.json** (percent, default 100, from 50 to 300, anything else = 100; only in the file): the text
+  AND the rows of the csv table, e.g. 150 = both 1.5 times as big, for reading at a distance. 100 = the size of before (text
+  4 points bigger than the window's, rows 14 px higher than the text); the column titles and widths follow. A hand-edited
+  setting: a change is used at once when the window is active again (`ResizeCsvTable`, in proportion to the font in use,
+  so the screen scaling stays). Explained in `program-folder\README.md`.
+- New tests: the board button's place and size, the counter size, the toggle with the hidden small map, tapping,
+  ShowBoardByDefault in the window and in settings.json, the touch-sized Browse buttons, RowHeightCSV in the table (also
+  while running) and in settings.json (13). 233 tests.
+
+## 1.1.5 — 2026-11-08 (Daan)
+
+- **Delivery:** `dist\v1.1.5\DssLabelTemplate.exe`, 53,216,407 bytes, file version 1.1.5.0, SHA-256
+  `5d1ffc7f4a94d41500e6e6365f90a53ac5e3024d903b1a147038b00da65b3599`. Built by `publish.cmd` after all 220 tests passed;
+  the exe itself was not started.
+- **Banner 15% smaller:** 551 x 86 at 100% (was 648 x 101 = 1.2 x 540 x 84), the same as TsDssConverter 1.1.3. Proportions kept.
+- **Shift+click on the ROGIERS logo opens `settings.json` in Notepad** (`MainForm.LogoClicked`); a normal click still opens
+  rogiers.be. Hidden on purpose. A deleted file is written first with the settings in use.
+- **Hand edits of `settings.json` are kept and used at once.** Every save reads the file again and takes the hand-edited
+  settings from it (`SettingsStore.SaveKeepingHandEdits`, `AppSettings.CopyHandEditedSettingsFrom`); before, the next save
+  (at the latest the window position when closing) wrote the values read at start back and threw the edit away. A file with a
+  mistake, or one that cannot be opened right now, is not overwritten (that save is skipped, quietly). When the window becomes
+  active again and the file's date changed (`OnActivated`), the hand-edited settings are read again and used
+  (`UseHandEditedSettings`: sheet map, rotation, print button); a file with a mistake gives ONE message per change.
+  `SettingsStore.Read` now says whether the file could be used (`SettingsReadResult`). `program-folder\README.md` explains it
+  (an existing README in `C:\DssLabelTemplate` is not replaced: delete it to get the new one).
+- New tests: settings saving / reading (5), using hand-edited settings in the window (1). 220 tests.
+
 ## 1.1.4 rebuild — 2026-10-27 (same version number, Daan)
 
 - **Delivery:** `dist\v1.1.4\DssLabelTemplate.exe`, 53,214,092 bytes, file version 1.1.4.0, SHA-256

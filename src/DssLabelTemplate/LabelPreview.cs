@@ -27,6 +27,7 @@ internal class LabelPreview : Control
     private SheetCorner _referenceCorner = SheetCorner.BottomLeft;
     private bool _showRotation;
     private bool _rotationClockwise;
+    private bool _showSheetMap = true;
 
     public LabelPreview()
     {
@@ -107,6 +108,22 @@ internal class LabelPreview : Control
         }
     }
 
+    /// <summary>
+    /// False while the board (<see cref="SheetBoard"/>) shows the sheet big in the left column (Daan, 2026-11-08): then the
+    /// small sheet map below the label is left out and the label gets its room.
+    /// </summary>
+    [System.ComponentModel.Browsable(false)]
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public bool ShowSheetMap
+    {
+        get => _showSheetMap;
+        set
+        {
+            _showSheetMap = value;
+            Invalidate();
+        }
+    }
+
     /// <summary>True: a positive ROTATION turns the label clockwise (<see cref="AppSettings.LabelDirection"/> "CW").</summary>
     [System.ComponentModel.Browsable(false)]
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
@@ -148,23 +165,10 @@ internal class LabelPreview : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics;
-        g.Clear(FluentDrawing.BehindColor(this));
-        g.SmoothingMode = SmoothingMode.AntiAlias;
         Problems.Clear();
         ObjectsOutside = 0;
 
-        // The same rounded frame as the editor next to it, on the very pale blue of the panels.
-        float radius = LogicalToDeviceUnits(FluentDrawing.CornerRadius);
-        using (GraphicsPath frame = FluentDrawing.RoundedRectangle(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), radius))
-        using (var fill = new SolidBrush(Theme.VeryPaleBlue))
-        using (var pen = new Pen(Theme.LightBlue, 1))
-        {
-            g.FillPath(fill, frame);
-            g.DrawPath(pen, frame);
-        }
-
-        int margin = LogicalToDeviceUnits(Margin16);
-        var inside = new Rectangle(margin, margin, Math.Max(0, Width - 2 * margin), Math.Max(0, Height - 2 * margin));
+        Rectangle inside = DrawPanel(g, this);
 
         if (_labels == null)
         {
@@ -184,14 +188,47 @@ internal class LabelPreview : Control
         }
     }
 
+    /// <summary>
+    /// The background of the preview and of the board (<see cref="SheetBoard"/>): the same rounded frame as the editor,
+    /// on the very pale blue of the panels. Returns the room inside it, within the margin.
+    /// </summary>
+    internal static Rectangle DrawPanel(Graphics g, Control control)
+    {
+        g.Clear(FluentDrawing.BehindColor(control));
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+
+        float radius = control.LogicalToDeviceUnits(FluentDrawing.CornerRadius);
+        using (GraphicsPath frame = FluentDrawing.RoundedRectangle(new RectangleF(0.5f, 0.5f, control.Width - 1, control.Height - 1), radius))
+        using (var fill = new SolidBrush(Theme.VeryPaleBlue))
+        using (var pen = new Pen(Theme.LightBlue, 1))
+        {
+            g.FillPath(fill, frame);
+            g.DrawPath(pen, frame);
+        }
+
+        return PanelInside(control);
+    }
+
+    /// <summary>The room inside the panel's frame, within the margin (where the board draws the sheet).</summary>
+    internal static Rectangle PanelInside(Control control)
+    {
+        int margin = control.LogicalToDeviceUnits(Margin16);
+        return new Rectangle(margin, margin, Math.Max(0, control.Width - 2 * margin), Math.Max(0, control.Height - 2 * margin));
+    }
+
+    /// <summary>True when the shown label knows its sheet (length and width): only then is there a sheet map / board.</summary>
+    internal bool ShownLabelHasSheet =>
+        Count > 0 && _labels!.Error == null && _labels.Labels[_index] is { SheetLength: > 0, SheetWidth: > 0 };
+
     private void DrawLabelAndSheet(Graphics g, Rectangle inside)
     {
         LabelItem label = _labels!.Labels[_index];
         int gap = LogicalToDeviceUnits(Gap);
         int line = Font.Height;
         bool hasSheet = label.SheetLength > 0 && label.SheetWidth > 0;
-        int mapHeight = hasSheet ? MapHeight(Height, gap, LogicalToDeviceUnits(Margin16)) : 0;
-        int labelHeight = inside.Height - 2 * line - gap - (hasSheet ? mapHeight + gap : 0);
+        bool drawMap = hasSheet && _showSheetMap; // not while the board shows the same map big: the label gets its room
+        int mapHeight = drawMap ? MapHeight(Height, gap, LogicalToDeviceUnits(Margin16)) : 0;
+        int labelHeight = inside.Height - 2 * line - gap - (drawMap ? mapHeight + gap : 0);
         if (labelHeight <= 0)
         {
             return; // the window is too small to show anything sensible
@@ -254,9 +291,10 @@ internal class LabelPreview : Control
         }
 
         // 4. The sheet with all its labels.
-        if (hasSheet)
+        if (drawMap)
         {
-            DrawSheetMap(g, new Rectangle(inside.Left, top + 2 * line + gap, inside.Width, mapHeight), label, size);
+            DrawSheetMap(g, this, new Rectangle(inside.Left, top + 2 * line + gap, inside.Width, mapHeight),
+                _labels.Labels, _index, size, _sheetRotation, _referenceCorner);
         }
     }
 
@@ -265,13 +303,17 @@ internal class LabelPreview : Control
     /// length, Y along the width, measured from <see cref="ReferenceCorner"/> (DSSClient's corner, marked with a round dot).
     /// X, Y is the middle of the label (Duivestein's description of the label-csv).
     /// The whole map (sheet and labels) is turned by <see cref="SheetRotation"/>, so it matches how the operator sees the
-    /// sheet from the label PC.
+    /// sheet from the label PC. Static: the small map below the label and the big board in the left column
+    /// (<see cref="SheetBoard"/>) are drawn by this same code.
     /// </summary>
-    private void DrawSheetMap(Graphics g, Rectangle area, LabelItem shown, SizeF labelSize)
+    /// <param name="control">The control drawn on: its screen scaling sizes the zero-point dot and the smallest square.</param>
+    /// <param name="shownIndex">The label that is shown in the preview: drawn in the brand colour.</param>
+    internal static void DrawSheetMap(Graphics g, Control control, Rectangle area, IReadOnlyList<LabelItem> labels, int shownIndex,
+        SizeF labelSize, int sheetRotation, SheetCorner referenceCorner)
     {
+        LabelItem shown = labels[shownIndex];
         float length = (float)shown.SheetLength!.Value, width = (float)shown.SheetWidth!.Value;
-        int turns = QuarterTurns(_sheetRotation);
-        float scale = MapScale(area, length, width, turns);
+        int turns = QuarterTurns(sheetRotation);
 
         // Two opposite corners of the sheet, wherever the turn puts them.
         PointF corner1 = MapPoint(area, length, width, turns, 0, 0);
@@ -286,41 +328,29 @@ internal class LabelPreview : Control
             g.DrawRectangle(border, sheet.X, sheet.Y, sheet.Width, sheet.Height);
         }
 
-        // A quarter turn also turns the labels: their length then runs up and down the map.
-        float labelAcross = turns % 2 == 0 ? labelSize.Width : labelSize.Height;
-        float labelUpDown = turns % 2 == 0 ? labelSize.Height : labelSize.Width;
-        float minimum = LogicalToDeviceUnits(4);
-        float squareWidth = Math.Max(minimum, labelAcross * scale), squareHeight = Math.Max(minimum, labelUpDown * scale);
+        // The other labels first, the shown one last (on top, with an outline).
         using var others = new SolidBrush(Theme.PaleBlue);
         using var current = new SolidBrush(Theme.Brand);
         using var outline = new Pen(Theme.Navy, 1);
+        List<(int Index, RectangleF Square)> squares = LabelSquares(control, area, labels, labelSize, sheetRotation, referenceCorner, length, width);
 
-        for (int i = 0; i < Count; i++)
+        foreach (var (index, square) in squares.Where(item => item.Index != shownIndex))
         {
-            LabelItem label = _labels!.Labels[i];
-            if (label.X is not double x || label.Y is not double y || i == _index)
-            {
-                continue;
-            }
-
-            var (fromLeft, fromBottom) = ToBottomLeft(_referenceCorner, length, width, x, y);
-            g.FillRectangle(others, Square(MapPoint(area, length, width, turns, fromLeft, fromBottom), squareWidth, squareHeight));
+            g.FillRectangle(others, square);
         }
 
-        if (shown.X is double shownX && shown.Y is double shownY)
+        foreach (var (_, square) in squares.Where(item => item.Index == shownIndex))
         {
-            var (fromLeft, fromBottom) = ToBottomLeft(_referenceCorner, length, width, shownX, shownY);
-            RectangleF square = Square(MapPoint(area, length, width, turns, fromLeft, fromBottom), squareWidth, squareHeight);
             g.FillRectangle(current, square);
             g.DrawRectangle(outline, square.X, square.Y, square.Width, square.Height);
         }
 
         // A round dot on the zero point (X 0, Y 0): the corner the label X / Y are measured from. Drawn last, so a label in
         // that corner does not hide it; it turns with the map. Navy with a white ring, as in TsDssConverter's corner schematic.
-        var (originX, originY) = ToBottomLeft(_referenceCorner, length, width, 0, 0);
+        var (originX, originY) = ToBottomLeft(referenceCorner, length, width, 0, 0);
         PointF origin = MapPoint(area, length, width, turns, originX, originY);
-        float dot = LogicalToDeviceUnits(OriginDot);
-        float ring = LogicalToDeviceUnits(OriginDot + 2 * OriginRing);
+        float dot = control.LogicalToDeviceUnits(OriginDot);
+        float ring = control.LogicalToDeviceUnits(OriginDot + 2 * OriginRing);
         using (var ringBrush = new SolidBrush(Theme.White))
         using (var dotBrush = new SolidBrush(Theme.Navy))
         {
@@ -328,6 +358,77 @@ internal class LabelPreview : Control
             g.FillEllipse(dotBrush, origin.X - dot / 2, origin.Y - dot / 2, dot, dot);
         }
     }
+
+    /// <summary>
+    /// Where every label (with an X and Y) is drawn on the sheet map in <paramref name="area"/>: one square per label, as
+    /// big as the label (at least 4 pixels at 100%). Used for drawing AND for finding the label that was tapped on the
+    /// board (<see cref="FindLabelAt"/>), so the two can never disagree.
+    /// </summary>
+    private static List<(int Index, RectangleF Square)> LabelSquares(Control control, RectangleF area, IReadOnlyList<LabelItem> labels,
+        SizeF labelSize, int sheetRotation, SheetCorner referenceCorner, float length, float width)
+    {
+        int turns = QuarterTurns(sheetRotation);
+        float scale = MapScale(area, length, width, turns);
+
+        // A quarter turn also turns the labels: their length then runs up and down the map.
+        float labelAcross = turns % 2 == 0 ? labelSize.Width : labelSize.Height;
+        float labelUpDown = turns % 2 == 0 ? labelSize.Height : labelSize.Width;
+        float minimum = control.LogicalToDeviceUnits(4);
+        float squareWidth = Math.Max(minimum, labelAcross * scale), squareHeight = Math.Max(minimum, labelUpDown * scale);
+
+        var squares = new List<(int Index, RectangleF Square)>();
+        for (int i = 0; i < labels.Count; i++)
+        {
+            if (labels[i].X is double x && labels[i].Y is double y)
+            {
+                var (fromLeft, fromBottom) = ToBottomLeft(referenceCorner, length, width, x, y);
+                squares.Add((i, Square(MapPoint(area, length, width, turns, fromLeft, fromBottom), squareWidth, squareHeight)));
+            }
+        }
+
+        return squares;
+    }
+
+    /// <summary>
+    /// The label that was tapped or clicked on the sheet map in <paramref name="area"/> (the board), or -1 for none. A
+    /// square that holds the point wins; otherwise the nearest label within <paramref name="reach"/> pixels of its edge,
+    /// because a finger is bigger than the small square of a label on a big sheet. Of several, the one whose middle is
+    /// nearest (labels close together). Uses the sheet of <paramref name="shownIndex"/>, like the drawing.
+    /// </summary>
+    internal static int FindLabelAt(Control control, Rectangle area, IReadOnlyList<LabelItem> labels, int shownIndex, SizeF labelSize,
+        int sheetRotation, SheetCorner referenceCorner, Point point, float reach)
+    {
+        LabelItem shown = labels[shownIndex];
+        if (shown.SheetLength is not > 0 || shown.SheetWidth is not > 0)
+        {
+            return -1;
+        }
+
+        int best = -1;
+        float bestDistance = float.MaxValue;
+        foreach (var (index, square) in LabelSquares(control, area, labels, labelSize, sheetRotation, referenceCorner,
+                     (float)shown.SheetLength.Value, (float)shown.SheetWidth.Value))
+        {
+            RectangleF grown = RectangleF.Inflate(square, reach, reach);
+            if (!grown.Contains(point))
+            {
+                continue;
+            }
+
+            // Inside the square itself counts as distance 0 to its edge; then the middle decides between neighbours.
+            float toMiddle = Distance(point, new PointF(square.X + square.Width / 2, square.Y + square.Height / 2));
+            float distance = (square.Contains(point) ? 0 : 1_000_000) + toMiddle;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = index;
+            }
+        }
+
+        return best;
+    }
+
+    private static float Distance(PointF a, PointF b) => MathF.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
 
     /// <summary>
     /// The height of the sheet map: together with the gap above it and the margin below it, <see cref="SheetMapShare"/> of

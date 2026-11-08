@@ -136,6 +136,17 @@ internal static class Strings
     public static string PreviousLabel => T("Vorig label", "Étiquette précédente", "Previous label");
     public static string NextLabel => T("Volgend label", "Étiquette suivante", "Next label");
 
+    /// <summary>The board view in the left column (the "View board" button left of the arrows): its title and tooltip.</summary>
+    public static string BoardCaption => T("Plaat met de labelposities", "Panneau avec les positions des étiquettes", "Board with the label positions");
+    public static string BoardTooltip => T(
+        "Plaat tonen: alle labelposities in de linkerkolom (nog eens klikken: terug)",
+        "Afficher le panneau : toutes les positions des étiquettes dans la colonne de gauche (cliquer à nouveau : retour)",
+        "View board: all label positions in the left column (click again to go back)");
+    public static string BoardWithoutSheet => T(
+        "Deze labels hebben geen plaatformaat: er is geen plaat om te tonen.",
+        "Ces étiquettes n'ont pas de format de panneau : il n'y a pas de panneau à afficher.",
+        "These labels have no sheet size: there is no board to show.");
+
     /// <summary>The tooltip of the print button right of the arrows.</summary>
     public static string PrintTooltip => T(
         "Label(s) afdrukken… (Ctrl+P)",
@@ -275,6 +286,20 @@ internal static class Strings
         $"Er kon niet worden afgedrukt: {reason}",
         $"L'impression a échoué : {reason}",
         $"Could not print: {reason}");
+
+    /// <summary>settings.json was edited by hand while the program runs and now has a mistake (shown once per change).</summary>
+    public static string SettingsFileHasMistake(string path, string reason) => T(
+        $"settings.json werd gewijzigd maar bevat een fout ({reason}). De vorige instellingen blijven in gebruik, en het " +
+        $"bestand wordt niet overschreven tot het verbeterd is: {path}",
+        $"settings.json a été modifié mais contient une erreur ({reason}). Les paramètres précédents restent utilisés et le " +
+        $"fichier n'est pas écrasé jusqu'à ce qu'il soit corrigé : {path}",
+        $"settings.json was changed but contains a mistake ({reason}). The previous settings stay in use, and the file is " +
+        $"not overwritten until it is fixed: {path}");
+
+    public static string CannotOpenFile(string reason) => T(
+        $"Het bestand kon niet worden geopend: {reason}",
+        $"Le fichier n'a pas pu être ouvert : {reason}",
+        $"The file could not be opened: {reason}");
 
     public static string CannotOpenLink(string reason) => T(
         $"De website kon niet worden geopend: {reason}",

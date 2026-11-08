@@ -73,6 +73,26 @@ internal class AppSettings
     public bool HideWindowsPrintDialog { get; set; }
 
     /// <summary>
+    /// True: every opened file is shown on the board (the left column shows the sheet with all label positions, as after
+    /// pressing the board button) instead of the csv table or template text (Daan, 2026-11-08). Only when the labels know
+    /// their sheet; the board button still closes it. ONLY in settings.json, not in the window. Default false.
+    /// </summary>
+    public bool ShowBoardByDefault { get; set; }
+
+    /// <summary>
+    /// How big the rows AND the text of the csv table are, in percent of the standard (Daan, 2026-11-08): 100 = the standard
+    /// (the text 4 points bigger than the window's, the rows 14 px higher than the text), 150 = both 1.5 times as big, for
+    /// reading at a distance. From 50 to 300; anything else is 100 on loading. ONLY in settings.json, not in the window.
+    /// </summary>
+    public int RowHeightCSV { get; set; } = DefaultCsvRowSize;
+
+    public const int DefaultCsvRowSize = 100;
+    public const int MinimumCsvRowSize = 50;
+    public const int MaximumCsvRowSize = 300;
+
+    public static bool IsValidCsvRowSize(int percent) => percent >= MinimumCsvRowSize && percent <= MaximumCsvRowSize;
+
+    /// <summary>
     /// The order of the columns in the csv table, as the operator dragged them (Daan, 2026-10-27): the column names, first
     /// = left. Saved after every drag; used again for every label-csv that is opened. Columns of a csv that are not in the
     /// list keep their file order after the ones that are; names the csv does not have are skipped (and kept for a csv
@@ -114,6 +134,45 @@ internal class AppSettings
     public int WindowWidth { get; set; }
     public int WindowHeight { get; set; }
     public bool WindowMaximized { get; set; }
+
+    /// <summary>A separate copy (the column order too).</summary>
+    public AppSettings Clone()
+    {
+        var copy = (AppSettings)MemberwiseClone();
+        copy.CsvColumnOrder = new List<string>(CsvColumnOrder);
+        return copy;
+    }
+
+    /// <summary>
+    /// Takes the settings that are ONLY in settings.json (edited by hand, not in the window) from <paramref name="file"/>.
+    /// Used when saving and when the file was edited while the program runs: settings.json wins for these, the window
+    /// for all the others. A new hidden setting must be added here and in <see cref="HasSameHandEditedSettings"/> (a test
+    /// checks that every setting is either here or known as a setting of the window).
+    /// </summary>
+    public void CopyHandEditedSettingsFrom(AppSettings file)
+    {
+        SheetRotationInViewer = file.SheetRotationInViewer;
+        ShowLabelRotation = file.ShowLabelRotation;
+        PrintLabelWithRotation = file.PrintLabelWithRotation;
+        HideWindowsPrintDialog = file.HideWindowsPrintDialog;
+        ShowBoardByDefault = file.ShowBoardByDefault;
+        RowHeightCSV = file.RowHeightCSV;
+        LabelDirection = file.LabelDirection;
+        SheetReferenceCorner = file.SheetReferenceCorner;
+    }
+
+    /// <summary>True when the settings that are only in settings.json are the same in both.</summary>
+    public bool HasSameHandEditedSettings(AppSettings other)
+    {
+        return SheetRotationInViewer == other.SheetRotationInViewer
+            && ShowLabelRotation == other.ShowLabelRotation
+            && PrintLabelWithRotation == other.PrintLabelWithRotation
+            && HideWindowsPrintDialog == other.HideWindowsPrintDialog
+            && ShowBoardByDefault == other.ShowBoardByDefault
+            && RowHeightCSV == other.RowHeightCSV
+            && LabelDirection == other.LabelDirection
+            && SheetReferenceCorner == other.SheetReferenceCorner;
+    }
 }
 
 /// <summary>The four corners of a sheet that the label X / Y can be measured from (<see cref="AppSettings.SheetReferenceCorner"/>).</summary>
@@ -155,6 +214,21 @@ internal static class SheetCorners
     public static string Name(SheetCorner corner) => KnownNames.First(known => known.Corner == corner).Names[0];
 }
 
+/// <summary>What <see cref="SettingsStore.Read"/> found.</summary>
+internal class SettingsReadResult
+{
+    /// <summary>The settings of the file; the defaults when it is missing or could not be read.</summary>
+    public AppSettings Settings { get; set; } = new();
+
+    public bool FileExisted { get; set; }
+
+    /// <summary>Not empty when the file exists but could not be used (a mistake in its text, or it could not be opened).</summary>
+    public string Error { get; set; } = "";
+
+    /// <summary>True when the file could not be opened (in use, no permission): a moment later it may work.</summary>
+    public bool ErrorIsTemporary { get; set; }
+}
+
 /// <summary>Reads and writes settings.json. Never throws on reading: a missing or broken file gives the defaults.</summary>
 internal static class SettingsStore
 {
@@ -165,16 +239,58 @@ internal static class SettingsStore
         AllowTrailingCommas = true,
     };
 
+    /// <summary>settings.json, or the defaults when it is missing or cannot be read (these settings are only conveniences).</summary>
     public static AppSettings Load(string path)
     {
+        return Read(path).Settings;
+    }
+
+    /// <summary>
+    /// Saves the settings of the window WITHOUT losing what someone edited by hand in settings.json meanwhile (in Notepad,
+    /// Shift+click on the logo): the file is read again first, and the settings that are only edited by hand are taken
+    /// from it (<see cref="AppSettings.CopyHandEditedSettingsFrom"/>). A file with a mistake, or one that cannot be read
+    /// right now, is NOT overwritten: then nothing is saved and false is returned (the program saves often, a message
+    /// every time would only be in the way). May throw IOException when writing fails.
+    /// </summary>
+    public static bool SaveKeepingHandEdits(string path, AppSettings fromWindow)
+    {
+        SettingsReadResult onDisk = Read(path);
+        if (onDisk.Error != "")
+        {
+            return false;
+        }
+
+        AppSettings toSave = fromWindow;
+        if (onDisk.FileExisted)
+        {
+            toSave = fromWindow.Clone();
+            toSave.CopyHandEditedSettingsFrom(onDisk.Settings);
+        }
+
+        Save(path, toSave);
+        return true;
+    }
+
+    /// <summary>Reads settings.json and says whether that worked. Never throws.</summary>
+    public static SettingsReadResult Read(string path)
+    {
+        var result = new SettingsReadResult();
         try
         {
             if (!File.Exists(path))
             {
-                return new AppSettings();
+                return result;
             }
 
-            AppSettings settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), Options) ?? new AppSettings();
+            result.FileExisted = true;
+            string json;
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var reader = new StreamReader(stream))
+            {
+                json = reader.ReadToEnd();
+            }
+
+            AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json, Options) ?? new AppSettings();
 
             // "null" in the file: back to the default
             settings.Language ??= "nl";
@@ -194,6 +310,12 @@ internal static class SettingsStore
             if (!AppSettings.IsValidEditorColumnShare(settings.EditorColumnShare))
             {
                 settings.EditorColumnShare = AppSettings.DefaultEditorColumnShare;
+            }
+
+            // A csv row size edited by hand into something impossible (e.g. 5 or 1000 percent): back to the standard.
+            if (!AppSettings.IsValidCsvRowSize(settings.RowHeightCSV))
+            {
+                settings.RowHeightCSV = AppSettings.DefaultCsvRowSize;
             }
 
             // A sheet rotation edited by hand into something that is not a quarter turn (e.g. 45): the sheet straight again.
@@ -219,11 +341,16 @@ internal static class SettingsStore
                 settings.LabelWidth = AppSettings.DefaultLabelSize;
             }
 
-            return settings;
+            result.Settings = settings;
+            return result;
         }
         catch (Exception error) when (error is JsonException || error is IOException || error is UnauthorizedAccessException)
         {
-            return new AppSettings(); // these settings are only conveniences: start with the defaults
+            // These settings are only conveniences: start with the defaults (the file itself is left alone).
+            result.Settings = new AppSettings();
+            result.Error = error.Message;
+            result.ErrorIsTemporary = error is IOException || error is UnauthorizedAccessException;
+            return result;
         }
     }
 

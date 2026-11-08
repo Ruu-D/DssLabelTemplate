@@ -13,6 +13,169 @@ public class SettingsTests
         Assert.Equal("", settings.LastFile);
     }
 
+    // ---------------------------------------------------------------- settings.json edited by hand while the program runs
+
+    // The settings that are ONLY in settings.json (edited by hand); every other setting belongs to the window.
+    private static readonly string[] HandEditedSettings =
+    {
+        "SheetRotationInViewer", "ShowLabelRotation", "PrintLabelWithRotation", "HideWindowsPrintDialog", "LabelDirection",
+        "SheetReferenceCorner", "ShowBoardByDefault", "RowHeightCSV",
+    };
+
+    [Fact]
+    public void RowHeightCSV_Is100ByDefault_AndIsSavedAndLoaded()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+        Assert.Equal(100, new AppSettings().RowHeightCSV);
+
+        SettingsStore.Save(path, new AppSettings { RowHeightCSV = 150 });
+
+        Assert.Equal(150, SettingsStore.Load(path).RowHeightCSV);
+        Assert.Contains("\"RowHeightCSV\": 150", File.ReadAllText(path));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(49)]
+    [InlineData(301)]
+    [InlineData(1000)]
+    public void AnImpossibleRowHeightCSV_IsBackTo100(int percent)
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+        File.WriteAllText(path, "{ \"RowHeightCSV\": " + percent + " }");
+
+        Assert.Equal(100, SettingsStore.Load(path).RowHeightCSV);
+    }
+
+    [Fact]
+    public void ShowBoardByDefault_IsOffByDefault_AndIsSavedAndLoaded()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+        Assert.False(new AppSettings().ShowBoardByDefault);
+
+        SettingsStore.Save(path, new AppSettings { ShowBoardByDefault = true });
+
+        Assert.True(SettingsStore.Load(path).ShowBoardByDefault);
+        Assert.Contains("\"ShowBoardByDefault\": true", File.ReadAllText(path));
+    }
+
+    private static readonly string[] WindowSettings =
+    {
+        "Language", "LastFile", "LastCsvFile", "LabelLength", "LabelWidth", "PrinterName", "EditorColumnShare", "CsvColumnOrder",
+        "WindowLeft", "WindowTop", "WindowWidth", "WindowHeight", "WindowMaximized",
+    };
+
+    [Fact]
+    public void EverySetting_IsEitherOfTheWindowOrEditedByHand()
+    {
+        // A new setting must be put in one of the two lists above, and in AppSettings.CopyHandEditedSettingsFrom /
+        // HasSameHandEditedSettings if it is only in the file: otherwise a save would quietly throw away a hand edit.
+        var names = typeof(AppSettings).GetProperties().Where(property => property.CanWrite).Select(property => property.Name).OrderBy(name => name);
+
+        Assert.Equal(HandEditedSettings.Concat(WindowSettings).OrderBy(name => name), names);
+    }
+
+    [Fact]
+    public void SaveKeepingHandEdits_TakesTheWindowsSettings_AndKeepsWhatWasEditedByHandInTheFile()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        // The program runs with the defaults; meanwhile someone edits the hidden settings (and the language) in Notepad.
+        var inUse = new AppSettings();
+        SettingsStore.Save(path, inUse);
+        File.WriteAllText(path, """
+            {
+              "Language": "en",
+              "SheetRotationInViewer": 90,
+              "ShowLabelRotation": true,
+              "PrintLabelWithRotation": true,
+              "HideWindowsPrintDialog": true,
+              "LabelDirection": "CW",
+              "SheetReferenceCorner": "Rechtsboven"
+            }
+            """);
+
+        // The window saves its own changes (it still has the old hidden values in memory).
+        inUse.Language = "fr";
+        inUse.LabelLength = 60;
+        inUse.CsvColumnOrder = new List<string> { "PW", "PL" };
+        inUse.WindowWidth = 1200;
+        inUse.WindowHeight = 800; // a width without a height is forgotten on loading
+
+        Assert.True(SettingsStore.SaveKeepingHandEdits(path, inUse));
+        AppSettings onDisk = SettingsStore.Load(path);
+
+        // The window wins for its own settings ...
+        Assert.Equal("fr", onDisk.Language);
+        Assert.Equal(60, onDisk.LabelLength);
+        Assert.Equal(new[] { "PW", "PL" }, onDisk.CsvColumnOrder);
+        Assert.Equal(1200, onDisk.WindowWidth);
+
+        // ... the file for the hidden ones.
+        Assert.Equal(90, onDisk.SheetRotationInViewer);
+        Assert.True(onDisk.ShowLabelRotation);
+        Assert.True(onDisk.PrintLabelWithRotation);
+        Assert.True(onDisk.HideWindowsPrintDialog);
+        Assert.Equal("CW", onDisk.LabelDirection);
+        Assert.Equal("Rechtsboven", onDisk.SheetReferenceCorner);
+
+        Assert.False(inUse.HideWindowsPrintDialog); // the settings in use are not changed by saving
+    }
+
+    [Fact]
+    public void SaveKeepingHandEdits_AFileWithAMistake_IsNotOverwritten()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+        const string broken = "{ \"SheetRotationInViewer\": +90 }"; // "+90" is not valid json
+        File.WriteAllText(path, broken);
+
+        Assert.False(SettingsStore.SaveKeepingHandEdits(path, new AppSettings { Language = "fr" }));
+        Assert.Equal(broken, File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void SaveKeepingHandEdits_WithoutAFile_WritesTheSettingsInUse()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        Assert.True(SettingsStore.SaveKeepingHandEdits(path, new AppSettings { HideWindowsPrintDialog = true, Language = "fr" }));
+
+        AppSettings onDisk = SettingsStore.Load(path);
+        Assert.True(onDisk.HideWindowsPrintDialog);
+        Assert.Equal("fr", onDisk.Language);
+    }
+
+    [Fact]
+    public void Read_SaysWhetherTheFileCouldBeUsed()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+
+        Assert.False(SettingsStore.Read(path).FileExisted);
+
+        File.WriteAllText(path, "{ this is not json");
+        SettingsReadResult broken = SettingsStore.Read(path);
+        Assert.True(broken.FileExisted);
+        Assert.NotEqual("", broken.Error);
+        Assert.False(broken.ErrorIsTemporary);
+
+        File.WriteAllText(path, "{ \"Language\": \"fr\" }");
+        using (new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) // e.g. Notepad is still writing it
+        {
+            Assert.True(SettingsStore.Read(path).ErrorIsTemporary);
+        }
+
+        SettingsReadResult good = SettingsStore.Read(path);
+        Assert.Equal("", good.Error);
+        Assert.Equal("fr", good.Settings.Language);
+    }
+
     [Fact]
     public void ABrokenFile_GivesTheDefaults_AndDoesNotThrow()
     {

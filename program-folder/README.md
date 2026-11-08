@@ -10,6 +10,11 @@ The main application, **DssLabelTemplate.exe**, can be used to:
 
 There are several hidden parameters available in the **settings.json** file:
 
+- **Shift + click on the ROGIERS logo** (bottom left of the window) opens settings.json in Notepad. A normal click opens the website.
+- Save the file in Notepad, then click back into the DssLabelTemplate window: the new values are used at once, no restart needed.
+- The program never overwrites your changes when it saves its own settings (window position, language, ...).
+- If the file contains a mistake, a message tells you so: the previous settings stay in use and the file is not overwritten until it is fixed.
+
 ### PrinterName
 
 ```json
@@ -31,6 +36,22 @@ If `true`, the print button (and Ctrl+P) skips the Windows print dialog: the lab
 
 - The printer is `PrinterName` if it is filled in and installed, otherwise the default Windows printer.
 - Note: every print WITH the dialog stores the chosen printer in `PrinterName`. To print without the dialog on the default Windows printer, empty it: `"PrinterName": ""`.
+
+### ShowBoardByDefault
+
+```json
+"ShowBoardByDefault": true
+```
+
+If `true`, every file that is opened (also the files opened again when the program starts) is shown on the **board**: the left column shows the whole sheet with all label positions, as after pressing the board button. If `false` (default), a label CSV is shown as its table first. Only for labels that have a sheet size; the board button still switches the board off.
+
+### RowHeightCSV
+
+```json
+"RowHeightCSV": 150
+```
+
+How big the rows **and** the text of the label CSV table are, in percent: `100` (default) is the standard size, `150` makes both 1.5 times as big (easier to read at a distance), `75` smaller. From 50 to 300; any other value counts as 100. A change is used as soon as you click back into the window.
 
 ### CsvColumnOrder
 

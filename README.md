@@ -40,6 +40,8 @@ Sister tool of **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (wh
 | Turned preview and print follow the operator's view (rotation + `SheetRotationInViewer`); `LabelDirection` (`CCW` / `CW`) in `settings.json` | Done (1.1.4) |
 | `HideWindowsPrintDialog` in `settings.json`: print the shown label without the Windows dialog | Done (1.1.4 rebuild) |
 | Columns of the label CSV table can be dragged into another order, kept in `settings.json` (`CsvColumnOrder`); the CSV file is not changed | Done (1.1.4 rebuild) |
+| Banner 15% smaller (the same as TsDssConverter); **Shift+click on the ROGIERS logo** opens `settings.json` in Notepad (a normal click still opens the website); a hand edit is used as soon as you click back into the window and is no longer overwritten when the program saves; a file with a mistake is never overwritten | Done (1.1.5) |
+| **View board** button below the left column: the left column shows the whole sheet with all label positions (the shown label highlighted), the label preview gets bigger, and tapping a label on the board shows it (touch screen); click the button again to go back. The label counter is 1.5 x bigger. `ShowBoardByDefault` in `settings.json` opens every file on the board. The two Browse buttons and path boxes are higher (44 px) for touch. `RowHeightCSV` in `settings.json` makes the text and rows of the CSV table bigger (percent) | Done (1.2.0) |
 
 Third-party components: [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence) and
 [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence).

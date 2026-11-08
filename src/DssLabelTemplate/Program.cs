@@ -84,7 +84,8 @@ internal static class Program
             return;
         }
 
-        using var window = new MainForm(settings, changed => SettingsStore.Save(settingsFile, changed), options.FileToOpen, dataFolder);
+        // Every save reads settings.json again first and keeps what was edited there by hand (see SaveKeepingHandEdits).
+        using var window = new MainForm(settings, changed => SettingsStore.SaveKeepingHandEdits(settingsFile, changed), options.FileToOpen, dataFolder);
         Application.Run(window);
     }
 }
