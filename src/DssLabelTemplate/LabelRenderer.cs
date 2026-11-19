@@ -218,8 +218,16 @@ internal static class LabelRenderer
             return false;
         }
 
+        // An empty value (e.g. CAM3 of a part without a third program) gives NO barcode: an empty code still has bars, and
+        // an operator would try to scan it. Not a problem: the object is fine, there is just nothing to encode.
+        string text = label.Variables.Resolve(element.Value).Trim();
+        if (text.Length == 0)
+        {
+            return true;
+        }
+
         float rotation = Number(element, label, "Rotation") ?? 0;
-        bool[] modules = Code128.Modules(label.Variables.Resolve(element.Value).Trim());
+        bool[] modules = Code128.Modules(text);
         float module = width / modules.Length;
 
         using var ink = new SolidBrush(Theme.LabelInk);
@@ -260,7 +268,7 @@ internal static class LabelRenderer
     /// <summary>
     /// A real, scannable QR code (QRCoder, <see cref="QrCode"/>), as a square of the smaller of Width and Height with its
     /// top left corner at X, Y. The white border a scanner needs around it (the "quiet zone") is not drawn: the template
-    /// must leave room for it, like DSSPrintServer's own QR code presumably does.
+    /// must leave room for it, like DSSPrintServer's own QR code presumably does. An empty value draws nothing.
     /// </summary>
     private static bool DrawQrCode(Graphics g, XElement element, LabelItem label, bool forPrinter)
     {
@@ -271,7 +279,15 @@ internal static class LabelRenderer
             return false;
         }
 
-        bool[,]? modules = QrCode.Modules(label.Variables.Resolve(element.Value).Trim());
+        // An empty value (e.g. CAM3 of a part without a third program) gives NO QR code: QRCoder makes a perfectly valid
+        // code of an empty text, and an operator would try to scan it. Not a problem: there is just nothing to encode.
+        string text = label.Variables.Resolve(element.Value).Trim();
+        if (text.Length == 0)
+        {
+            return true;
+        }
+
+        bool[,]? modules = QrCode.Modules(text);
         if (modules == null)
         {
             return false; // too much text for any QR code

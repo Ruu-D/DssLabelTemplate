@@ -126,6 +126,68 @@ public class PrintingTests
         }
     }
 
+    [Theory]
+    [InlineData("QRCode")]
+    [InlineData("Barcode")]
+    public void AnEmptyValue_GivesNoCode_AndIsNotAProblem(string objectName)
+    {
+        // CAM3 is empty for most parts: an empty code would make the operator try to scan it.
+        var code = new XElement(objectName, new XAttribute("X", "5"), new XAttribute("Y", "5"), new XAttribute("Width", "30"),
+            new XAttribute("Height", "20"), "$CAM3$");
+        var row = new Dictionary<string, string> { ["CAM3"] = "  " };
+        var label = new LabelItem(new XElement("PrintLabel", new XAttribute("ID", "1"), code), new XElement("DSSPrintJob"),
+            new LabelVariables(row, DateTime.Now));
+
+        var problems = new List<string>();
+        using var picture = new Bitmap(400, 300);
+        using (Graphics g = Graphics.FromImage(picture))
+        {
+            g.Clear(Color.White);
+            g.ScaleTransform(10, 10);
+            using var images = new LabelImages();
+            LabelRenderer.Draw(g, label, null, images, problems);
+        }
+
+        Assert.Empty(problems);
+        for (int y = 0; y < picture.Height; y += 2)
+        {
+            for (int x = 0; x < picture.Width; x += 2)
+            {
+                Assert.False(IsDark(picture, x, y), $"dark pixel at {x}, {y}");
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("QRCode")]
+    [InlineData("Barcode")]
+    public void WithoutACsv_TheVariableStaysVisible_SoTheCodeIsStillDrawn(string objectName)
+    {
+        // The template on its own: $CAM3$ is not filled in, so the code shows where it will be.
+        var code = new XElement(objectName, new XAttribute("X", "5"), new XAttribute("Y", "5"), new XAttribute("Width", "30"),
+            new XAttribute("Height", "20"), "$CAM3$");
+
+        using var picture = new Bitmap(400, 300);
+        using (Graphics g = Graphics.FromImage(picture))
+        {
+            g.Clear(Color.White);
+            g.ScaleTransform(10, 10);
+            using var images = new LabelImages();
+            LabelRenderer.Draw(g, Label(code), null, images, new List<string>());
+        }
+
+        bool anyDark = false;
+        for (int y = 50; y < 250 && !anyDark; y++)
+        {
+            for (int x = 50; x < 350 && !anyDark; x++)
+            {
+                anyDark = IsDark(picture, x, y);
+            }
+        }
+
+        Assert.True(anyDark);
+    }
+
     private static string Flatten(bool[,] modules) => string.Concat(modules.Cast<bool>().Select(dark => dark ? '1' : '0'));
 
     // ---------------------------------------------------------------- whole printer dots

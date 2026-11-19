@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.1 — 2026-11-19 — no code for an empty value (Daan)
+
+- **Delivery:** `dist\v1.2.1\DssLabelTemplate.exe`, 54,561,815 bytes, file version 1.2.1.0, SHA-256
+  `63e43200a1ae93fbad3c254e8c6f03dc2fc873ea2baccc05a705a702779ff5f0`. Built by `publish.cmd` after all 238 tests passed;
+  started once with a scratch data folder (window opened, data folder written).
+- **Bug fix:** a `QRCode` or `Barcode` whose value is empty after the csv is filled in (e.g. `$CAM3$` for a part without a
+  third program, or `$CAM2$` when empty) printed an empty but valid code, and the operator tried to scan it. Such a code is
+  now not drawn, in the preview nor on paper, and not reported as a problem (`LabelRenderer.DrawQrCode` / `DrawBarcode`).
+  Without a csv the variable stays visible as text, so the template on its own still shows where the code goes.
+- 238 tests (four new in `PrintingTests`: empty value → nothing drawn and no problem; without a csv → still drawn, both for
+  QR code and barcode).
+
 ## 1.2.0 rebuild — 2026-11-08 — csv button below the left column (Daan)
 
 Released under the same number on Daan's request.

@@ -6,7 +6,7 @@ DssLabelTemplate is a small Windows tool for the label files of a Duivestein war
 printed, shows where it sits on the sheet, lets you edit the label layout, and reprints a damaged label at the unloading belt.
 Sister tool: **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (writes the label CSV files for the warehouse).
 
-> **Status:** version **1.2.0** (2026-11-08). Printing on the reprint printer (Zebra ZD220) works; real-world use at the
+> **Status:** version **1.2.1** (2026-11-19). Printing on the reprint printer (Zebra ZD220) works; real-world use at the
 > customer is going on. Full history: [CHANGELOG.md](CHANGELOG.md).
 
 ## At a glance
