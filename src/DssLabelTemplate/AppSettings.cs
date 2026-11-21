@@ -135,6 +135,13 @@ internal class AppSettings
     public int WindowHeight { get; set; }
     public bool WindowMaximized { get; set; }
 
+    /// <summary>
+    /// The two file lines folded up with their "v" (Daan, 2026-11-21): a folded line shows only its caption and the file
+    /// name, so the panels below get more height. Saved when the user folds or unfolds a line, used again at the start.
+    /// </summary>
+    public bool XmlFileLineFolded { get; set; }
+    public bool CsvFileLineFolded { get; set; }
+
     /// <summary>A separate copy (the column order too).</summary>
     public AppSettings Clone()
     {

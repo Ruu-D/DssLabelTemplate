@@ -41,12 +41,14 @@ public class MainFormTests
     }
 
     private static int RightEdge(Control control) => control.PointToScreen(new Point(control.Width, 0)).X;
+    private static int Left(Control control) => control.PointToScreen(Point.Empty).X;
     private static int Top(Control control) => control.PointToScreen(Point.Empty).Y;
+    private static int Bottom(Control control) => control.PointToScreen(new Point(0, control.Height)).Y;
 
-    // ---------------------------------------------------------------- the board view
+    // ---------------------------------------------------------------- the bottom bar and the tabs (2.0.0)
 
     [Fact]
-    public void TheBoardButton_SitsBelowTheLeftColumn_AgainstTheLine_LeftOfTheCounter_AsBigAsTheArrows()
+    public void TheRoundButtons_SitInTheBottomBar_CsvAndBoardAtTheLeft_TheArrowsAtTheEndOfTheBand_PrintOnTheGrey()
     {
         Sta.Run(() =>
         {
@@ -57,33 +59,105 @@ public class MainFormTests
             form.OpenLabelFiles(Samples.File(Samples.Template), Samples.File(Samples.Csv));
             window.Pump();
 
-            Assert.True(form.BoardButton.Visible);
-            Assert.Equal(form.PreviousButton.Size, form.BoardButton.Size);
-            Assert.Equal(Top(form.PreviousButton), Top(form.BoardButton));
-            Assert.Equal(RightEdge(form.EditorArea), RightEdge(form.BoardButton)); // the right edge of the left column
-            Assert.True(RightEdge(form.BoardButton) < form.LabelCounter.PointToScreen(Point.Empty).X, "left of the counter");
-            Assert.True(RightEdge(form.LogoPicture) < form.BoardButton.PointToScreen(Point.Empty).X, "right of the logo");
-            Assert.Equal(Top(form.LogoPicture) + form.LogoPicture.Height, Top(form.BoardButton) + form.BoardButton.Height);
-            Assert.NotNull(form.BoardButton.Image);
-            Assert.False(form.BoardButton.TabStop);
+            foreach (DiscButton disc in new[] { form.CsvViewButton, form.BoardButton, form.PreviousButton, form.NextButton })
+            {
+                Assert.True(disc.Visible);
+                Assert.True(form.BottomBar.Contains(disc));
+                int middle = Top(disc) + disc.Height / 2, arrowMiddle = Top(form.PreviousButton) + form.PreviousButton.Height / 2;
+                Assert.InRange(middle - arrowMiddle, -1, 1); // one line
+                Assert.True(disc.Height >= form.LogicalToDeviceUnits(56), "big enough for a finger: " + disc.Height);
+                Assert.False(disc.TabStop);
+            }
 
-            // The csv button (2026-11-08): just left of the board button, as big, an icon without text.
-            Assert.True(form.CsvViewButton.Visible);
-            Assert.Equal(form.BoardButton.Size, form.CsvViewButton.Size);
-            Assert.Equal(Top(form.BoardButton), Top(form.CsvViewButton));
-            Assert.True(RightEdge(form.CsvViewButton) < form.BoardButton.PointToScreen(Point.Empty).X, "left of the board button");
-            Assert.True(RightEdge(form.LogoPicture) < form.CsvViewButton.PointToScreen(Point.Empty).X, "right of the logo");
-            Assert.NotNull(form.CsvViewButton.Image);
-            Assert.Equal("", form.CsvViewButton.Text);
-            Assert.False(form.CsvViewButton.TabStop);
-            Assert.True(form.EditorHeader.Contains(form.XmlViewButton), "Template (xml) stays above the column");
-            Assert.False(form.EditorHeader.Contains(form.CsvViewButton));
+            // The csv and board buttons: the signs of the mockup (Daan, 2026-11-21), 20% bigger than the arrows so that the
+            // chosen one can grow without the button changing size.
+            Assert.Equal(Strings.CsvSign, form.CsvViewButton.Text);
+            Assert.Equal(DiscGlyph.Board, form.BoardButton.Glyph);
+            Assert.True(form.CsvViewButton.GrowWhenSelected && form.BoardButton.GrowWhenSelected);
+            Assert.False(form.PreviousButton.GrowWhenSelected || form.NextButton.GrowWhenSelected);
+            Assert.Equal(form.CsvViewButton.Size, form.BoardButton.Size);
+            Assert.InRange(form.BoardButton.Width / (double)form.PreviousButton.Width, 1.18, 1.22);
+            Assert.Equal(form.PreviousButton.Size, form.NextButton.Size);
 
-            form.DragColumnDivider(0); // the left column as narrow as it can be: the logo and the buttons still fit
+            // Left to right: csv, board, ..., previous, the counter, next; then the end of the blue band; then print.
+            Assert.True(RightEdge(form.CsvViewButton) < Left(form.BoardButton));
+            Assert.True(RightEdge(form.BoardButton) < Left(form.PreviousButton));
+            Assert.True(RightEdge(form.PreviousButton) <= Left(form.LabelCounter));
+            Assert.True(RightEdge(form.LabelCounter) <= Left(form.NextButton));
+            int bandEnd = Left(form.BottomBar) + form.BottomBar.BandRight;
+            Assert.True(RightEdge(form.NextButton) <= bandEnd, "next is on the band");
+            Assert.True(Left(form.PrintButton) > bandEnd, "print is on the grey right of the band");
+            Assert.Equal(RightEdge(form.BottomBar) - form.LogicalToDeviceUnits(24), RightEdge(form.PrintButton));
+
+            // Only "Template (xml)" is a tab in the left panel's title (Daan, 2026-11-21: the Table and Board tabs went,
+            // the round buttons do it), against the panel's right edge.
+            Assert.True(form.XmlViewButton.Visible && form.EditorHeader.Contains(form.XmlViewButton));
+            Assert.DoesNotContain(form.EditorHeader.Controls.Cast<Control>(), control => control is TabButton tab && tab != form.XmlViewButton);
+            Assert.Equal(RightEdge(form.EditorArea), RightEdge(form.XmlViewButton));
+
+            form.Width = form.MinimumSize.Width; // the narrowest window: nothing runs into anything
             window.Pump();
-            Assert.True(RightEdge(form.LogoPicture) < form.CsvViewButton.PointToScreen(Point.Empty).X);
-            Assert.True(RightEdge(form.CsvViewButton) < form.BoardButton.PointToScreen(Point.Empty).X);
-            Assert.Equal(RightEdge(form.EditorArea), RightEdge(form.BoardButton));
+            Assert.True(RightEdge(form.BoardButton) < Left(form.PreviousButton));
+            Assert.True(RightEdge(form.NextButton) < Left(form.PrintButton));
+            Assert.True(RightEdge(form.PrintButton) <= RightEdge(form.BottomBar));
+        });
+    }
+
+    [Fact]
+    public void TheWindowHasNoWindowsTitleBar_ItsButtonsAndAClockAreInTheTopBar()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+            Assert.Equal(FormBorderStyle.None, form.FormBorderStyle); // Daan, 2026-11-21
+
+            // At the top right, in this order: the "?", the clock, minimise, maximise, close; close against the right.
+            Assert.True(RightEdge(form.UserGuideButton) < Left(form.Clock));
+            Assert.True(RightEdge(form.Clock) < Left(form.MinimizeButton));
+            Assert.True(RightEdge(form.MinimizeButton) < Left(form.MaximizeButton));
+            Assert.True(RightEdge(form.MaximizeButton) < Left(form.CloseButton));
+            Assert.Equal(RightEdge(form.TopBar) - form.TopBar.Padding.Right, RightEdge(form.CloseButton));
+            Assert.Matches(@"^\d\d:\d\d$", form.Clock.Time);
+            Assert.True(form.Clock.WidthNeeded() <= form.Clock.Width, "the clock shows its whole time");
+            Assert.InRange(form.Clock.TimeFont.Size * 0.73 / form.LogicalToDeviceUnits(18), 0.97, 1.03); // digits as high as the sign
+            Assert.True(form.Clock.HeightNeeded() <= form.Clock.Height);
+
+            // Maximise and back: the sign follows, and a maximised window has no resize edge.
+            form.MaximizeButton.PerformClick();
+            window.Pump();
+            Assert.Equal(FormWindowState.Maximized, form.WindowState);
+            Assert.True(form.MaximizeButton.Maximised);
+            Assert.Equal(Padding.Empty, form.Padding);
+            form.ToggleMaximized();
+            window.Pump();
+            Assert.Equal(FormWindowState.Normal, form.WindowState);
+            Assert.False(form.MaximizeButton.Maximised);
+            Assert.True(form.Padding.Left > 0);
+
+            // F11, like a browser: the whole monitor (taskbar included), F11 again: back (Daan, 2026-11-21).
+            Rectangle before = form.Bounds;
+            form.ToggleFullScreen();
+            window.Pump();
+            Assert.True(form.IsFullScreen);
+            Assert.Equal(Screen.FromControl(form).Bounds, form.Bounds);
+            form.ToggleFullScreen();
+            window.Pump();
+            Assert.False(form.IsFullScreen);
+            Assert.Equal(FormWindowState.Normal, form.WindowState);
+            Assert.Equal(before, form.Bounds);
+
+            // The ROGIERS logo and the "?" are as high as the clock sign, the "?" flat and grey like it.
+            Assert.Equal(form.LogicalToDeviceUnits(18), form.LogoPicture.Height);
+            Assert.True(form.UserGuideButton.Flat);
+            Assert.Equal(18, form.UserGuideButton.FlatDiameter);
+
+            form.MinimizeButton.PerformClick();
+            Assert.Equal(FormWindowState.Minimized, form.WindowState);
+            form.WindowState = FormWindowState.Normal;
+
+            form.CloseButton.PerformClick(); // nothing changed: it closes without a question
+            Assert.True(form.IsDisposed || !form.Visible);
         });
     }
 
@@ -101,24 +175,30 @@ public class MainFormTests
             form.BoardButton.PerformClick();   // the board
             window.Pump();
             Assert.True(form.ShowingBoard);
-            Assert.Equal(Theme.Brand, form.BoardButton.NormalFill);
-            Assert.NotEqual(Theme.Brand, form.XmlViewButton.NormalFill);
+            Assert.True(form.BoardButton.Selected);
+            Assert.False(form.XmlViewButton.Selected);
 
             form.BoardButton.PerformClick(); // closed: the table, not the text that was shown before
             window.Pump();
             Assert.False(form.ShowingBoard);
             Assert.True(form.ShowingCsv);
-            Assert.Equal(Theme.Brand, form.CsvViewButton.NormalFill);
+            Assert.True(form.CsvViewButton.Selected);
 
             form.BoardButton.PerformClick();
             form.CsvViewButton.PerformClick(); // the csv button closes the board too
             window.Pump();
             Assert.False(form.ShowingBoard);
             Assert.True(form.CsvGrid.Parent!.Visible);
-            Assert.NotEqual(Theme.Brand, form.BoardButton.NormalFill);
+            Assert.False(form.BoardButton.Selected);
 
-            form.CsvViewButton.PerformClick(); // again: the table stays (the template is chosen above the column)
+            form.CsvViewButton.PerformClick(); // again: the table stays (the template has its own tab)
             Assert.True(form.ShowingCsv);
+
+            form.BoardButton.PerformClick();
+            form.XmlViewButton.PerformClick(); // the tab closes the board too
+            Assert.False(form.ShowingCsv);
+            Assert.True(form.XmlViewButton.Selected);
+            Assert.False(form.CsvViewButton.Selected || form.BoardButton.Selected); // exactly one of the three is chosen
         });
 
         Sta.Run(() =>
@@ -182,7 +262,8 @@ public class MainFormTests
             {
                 Control frame = (form.XmlBrowseButton == browse ? form.XmlFileBox : form.CsvFileBox).Parent!;
                 Assert.True(browse.Height >= form.LogicalToDeviceUnits(44), "at least 44 high at 100%: " + browse.Height);
-                Assert.True(browse.Height > form.XmlViewButton.Height, "higher than a normal button");
+                Assert.True(browse.Height > form.SaveButton.Height, "higher than a normal button");
+                Assert.NotNull(browse.Image); // the folder before the text
                 Assert.Equal(browse.Height, frame.Height);
                 Assert.Equal(Top(browse), Top(frame));
             }
@@ -226,13 +307,19 @@ public class MainFormTests
     }
 
     [Fact]
-    public void TheLabelCounter_IsOneAndAHalfTimesTheWindowsFont()
+    public void TheLabelCounter_IsTwiceTheWindowsFont_WhiteAndBold_AndFitsTheLongestCounter()
     {
         Sta.Run(() =>
         {
             using var window = new Window();
-            Assert.InRange(window.Form.LabelCounter.Font.SizeInPoints / window.Form.Font.SizeInPoints, 1.45, 1.55);
-            Assert.True(window.Form.LabelCounter.Font.Bold);
+            MainForm form = window.Form;
+            Assert.InRange(form.LabelCounter.Font.SizeInPoints / form.Font.SizeInPoints, 1.95, 2.05);
+            Assert.True(form.LabelCounter.Font.Bold);
+            Assert.Equal(Theme.White, form.LabelCounter.ForeColor); // on the blue band
+
+            form.OpenLabelFiles(Samples.File(Samples.LabelXml), null);
+            window.Pump();
+            Assert.True(TextRenderer.MeasureText("8 / 8", form.LabelCounter.Font).Width <= form.LabelCounter.Width);
         });
     }
 
@@ -251,7 +338,7 @@ public class MainFormTests
 
             // Where label 3 (index 2) is drawn: the middle of its square on the board.
             LabelItem third = form.Preview.Labels!.Labels[2];
-            Rectangle area = LabelPreview.PanelInside(form.Board);
+            Rectangle area = form.Board.SheetArea();
             float length = (float)third.SheetLength!.Value, width = (float)third.SheetWidth!.Value;
             var (x, y) = LabelPreview.ToBottomLeft(SheetCorner.BottomLeft, length, width, third.X!.Value, third.Y!.Value);
             PointF middle = LabelPreview.MapPoint(area, length, width, 0, x, y);
@@ -282,7 +369,6 @@ public class MainFormTests
             form.OpenLabelFiles(Samples.File(Samples.Template), Samples.File(Samples.Csv));
             window.Pump();
             Assert.True(form.ShowingCsv);
-            Color normalFill = form.BoardButton.NormalFill;
 
             form.BoardButton.PerformClick();
             window.Pump();
@@ -291,11 +377,14 @@ public class MainFormTests
             Assert.True(form.Board.Visible);
             Assert.False(form.CsvGrid.Parent!.Visible);
             Assert.False(form.Editor.Parent!.Visible);
-            Assert.Equal(Strings.BoardCaption, form.EditorCaption.Text);
-            Assert.Equal(Theme.Brand, form.BoardButton.NormalFill); // "pressed": the same colour as the chosen view button
-            Assert.NotEqual(Theme.Brand, form.CsvViewButton.NormalFill);
-            Assert.Equal(form.EditorArea.Size, form.Board.Size); // the whole left column
-            Assert.False(form.Preview.ShowSheetMap); // the small map below the label is gone: the label gets its room
+            Assert.Equal(Strings.CsvCaption, form.EditorCaption.Text); // the same title as the table (Daan, 2026-11-21)
+            Assert.Equal(Samples.Csv, form.EditorCaption.Emphasis);
+            Assert.Equal(Strings.LabelCount(3), form.EditorCaption.Suffix);
+            Assert.True(form.BoardButton.Selected); // "pressed": the dark ring
+            Assert.False(form.CsvViewButton.Selected);
+            Assert.Equal(form.EditorArea.ClientSize.Height - form.EditorArea.Padding.Vertical, form.Board.Height); // the whole left panel
+            Assert.Equal(form.EditorArea.ClientSize.Width, form.Board.Width);
+            Assert.False(form.Preview.ShowSheetMap); // the small map next to the label is gone: the label gets its room
 
             form.ShowLabel(1); // the board follows the preview, and opening the next label does not close it
             window.Pump();
@@ -307,8 +396,8 @@ public class MainFormTests
             Assert.False(form.Board.Visible);
             Assert.True(form.CsvGrid.Parent!.Visible);
             Assert.True(form.Preview.ShowSheetMap); // the small map is back
-            Assert.Equal(normalFill, form.BoardButton.NormalFill);
-            Assert.Equal(Theme.Brand, form.CsvViewButton.NormalFill);
+            Assert.False(form.BoardButton.Selected);
+            Assert.True(form.CsvViewButton.Selected);
 
             form.BoardButton.PerformClick();
             form.XmlViewButton.PerformClick(); // a view button above the column closes the board too
@@ -355,7 +444,7 @@ public class MainFormTests
     // ---------------------------------------------------------------- layout
 
     [Fact]
-    public void BrowseClosePreviewLabelSizeAndDividers_EndAtTheSameRightEdge()
+    public void TheBrowseButtons_ThePreviewAndTheTiles_EndInLineAtTheRight()
     {
         Sta.Run(() =>
         {
@@ -364,20 +453,16 @@ public class MainFormTests
             form.OpenLabelFiles(Samples.File(Samples.LabelXml), null);
             window.Pump();
 
-            int edge = RightEdge(form.XmlBrowseButton);
-            Assert.Equal(edge, RightEdge(form.XmlBrowseButton));
-            Assert.Equal(edge, RightEdge(form.CsvBrowseButton));
-            Assert.Equal(edge, RightEdge(form.Preview));
-            Assert.Equal(edge, RightEdge(form.LabelWidthBox.Parent!));
-            foreach (Panel divider in form.Dividers)
-            {
-                Assert.Equal(edge, RightEdge(divider));
-            }
+            // The white panels end at the same right edge; the Browse buttons end at the inner padding of theirs.
+            Assert.Equal(RightEdge(form.XmlBrowseButton), RightEdge(form.CsvBrowseButton));
+            Assert.Equal(RightEdge(form.Preview) - form.LogicalToDeviceUnits(16), RightEdge(form.XmlBrowseButton));
+            Assert.Equal(RightEdge(form.Preview), RightEdge(form.SheetTile));
+            Assert.Equal(RightEdge(form.Preview) - form.LogicalToDeviceUnits(12), RightEdge(form.LabelWidthBox.Parent!));
         });
     }
 
     [Fact]
-    public void TheEditorAndThePreview_HaveTheSameWidthAndHeight_AndTheBigButtonsAndLogoEndTheWindow()
+    public void TheTwoPanels_StartAndEndInLine_WithTheSameGreyRoomAroundThem_AndTheBarsAtTheTopAndBottom()
     {
         Sta.Run(() =>
         {
@@ -386,18 +471,20 @@ public class MainFormTests
             Control editorFrame = form.Editor.Parent!;
 
             Assert.InRange(Math.Abs(editorFrame.Width - form.Preview.Width), 0, 1);
-            Assert.Equal(Top(editorFrame), Top(form.Preview));
-            Assert.Equal(editorFrame.Height, form.Preview.Height); // the bottoms are in line again
-            Assert.True(form.Preview.Height > 200, "row 2 is the big row: " + form.Preview.Height);
+            Assert.InRange(Top(editorFrame) - Top(form.Preview), 0, 1); // (the 1 px line below the left panel's title)
+            Assert.Equal(Bottom(editorFrame), Bottom(form.Tiles)); // the left panel ends with the tiles
+            Assert.True(form.Preview.Height > 200, "the preview is the big part: " + form.Preview.Height);
+            Assert.True(Top(form.Tiles) > Bottom(form.Preview), "the tiles are below the preview");
 
-            // Below them the last row of the window: the logo at the left, the big buttons below the preview, their
-            // bottoms in line, with as much white room below them as at the left and right of the window.
-            int navigationBottom = Top(form.PreviewNavigation) + form.PreviewNavigation.Height;
-            Assert.True(Top(form.PreviewNavigation) > Top(form.Preview) + form.Preview.Height, "below the preview");
-            Assert.Equal(navigationBottom, Top(form.LogoPicture) + form.LogoPicture.Height);
-            int roomBelow = form.PointToScreen(new Point(0, form.ClientSize.Height)).Y - navigationBottom;
-            int roomLeft = editorFrame.PointToScreen(Point.Empty).X - form.PointToScreen(Point.Empty).X;
-            Assert.Equal(roomLeft, roomBelow);
+            // The top bar at the top, the bottom bar at the bottom (inside the thin resize edge of the window, which has no
+            // Windows frame), the same grey room between them and the panels as at the left of the panels.
+            int gap = form.LogicalToDeviceUnits(14), edge = form.Padding.Left;
+            Assert.True(edge > 0, "a normal window has an edge to resize with");
+            Assert.Equal(form.PointToScreen(Point.Empty).Y, Top(form.TopBar)); // no edge at the top: the title tab sticks to it
+            Assert.Equal(form.PointToScreen(new Point(0, form.ClientSize.Height)).Y - edge, Bottom(form.BottomBar));
+            Assert.Equal(edge + gap, Left(editorFrame) - form.PointToScreen(Point.Empty).X);
+            Assert.Equal(gap, Top(form.BottomBar) - Bottom(form.Tiles));
+            Assert.Equal(gap, Top(form.XmlFileBox.Parent!.Parent!.Parent!.Parent!) - Bottom(form.TopBar)); // field, holder, lines, files panel
         });
     }
 
@@ -420,7 +507,7 @@ public class MainFormTests
     }
 
     [Fact]
-    public void SaveTemplate_IsOnlyShownAfterAChange_LeftOfTheViewButtons_AndThereIsNoCloseButton()
+    public void SaveTemplate_IsOnlyShownAfterAChange_JustBelowTemplateXml_AndThereIsNoCloseButton()
     {
         using var folder = new TempFolder();
         string path = folder.File("template.xml");
@@ -433,12 +520,16 @@ public class MainFormTests
             form.OpenLabelFiles(path, Samples.File(Samples.Csv));
             window.Pump();
             Assert.False(form.SaveButton.Visible); // just opened: nothing to save
+            Rectangle preview = form.Preview.RectangleToScreen(form.Preview.ClientRectangle);
 
             form.Editor.AppendText(" ");
             window.Pump();
             Assert.True(form.SaveButton.Visible);
-            Assert.Equal(Top(form.XmlViewButton), Top(form.SaveButton));
-            Assert.True(RightEdge(form.SaveButton) <= form.XmlViewButton.PointToScreen(Point.Empty).X, "left of Template (xml)");
+            Assert.True(Top(form.SaveButton) >= Bottom(form.XmlViewButton), "below Template (xml) (Daan, 2026-11-21)");
+            Assert.Equal(RightEdge(form.XmlViewButton), RightEdge(form.SaveButton)); // right below it, against the panel's edge
+            Assert.True(form.SaveButton.Width >= form.XmlViewButton.Width);
+            Assert.True(Bottom(form.SaveButton) <= Top(form.Editor.Parent!), "above the editor, not over it");
+            Assert.Equal(preview, form.Preview.RectangleToScreen(form.Preview.ClientRectangle)); // the right panel does not move
 
             Assert.True(form.SaveFile());
             window.Pump();
@@ -465,7 +556,71 @@ public class MainFormTests
     }
 
     [Fact]
-    public void TheArrowsAndPrint_SitBelowThePreview_InTheMiddle_TwiceAsHighAsTheOtherButtons()
+    public void TheTiles_ShowWhereTheShownLabelSits_AndItsSheet_AndFollowTheArrows()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+            Assert.Equal(Strings.NoValue, form.PositionTile.Value); // nothing open
+            Assert.Equal(Strings.NoValue, form.SheetTile.Value);
+            Assert.Equal(Strings.PositionTile, form.PositionTile.Caption);
+            Assert.Equal(Strings.SheetTile, form.SheetTile.Caption);
+
+            form.OpenLabelFiles(Samples.File(Samples.LabelXml), null);
+            window.Pump();
+            LabelItem first = form.Preview.Labels!.Labels[0];
+            Assert.Equal(string.Format(Strings.PositionFormat, "500", "1000"), form.PositionTile.Value);
+            Assert.Equal(Strings.Millimetres, form.PositionTile.Line1);
+            Assert.Equal(Strings.LabelDetails(first.Id, "0"), form.PositionTile.Line2);
+            Assert.Equal(string.Format(Strings.SheetSizeFormat, "2800", "2100"), form.SheetTile.Value);
+
+            form.NextButton.PerformClick();
+            Assert.Equal(string.Format(Strings.PositionFormat, "650", "300"), form.PositionTile.Value);
+            Assert.Contains(form.Preview.Labels.Labels[1].Id, form.PositionTile.Line2);
+
+            // The tiles are as high as their text needs, and the same for both.
+            Assert.Equal(form.PositionTile.Height, form.SheetTile.Height);
+            Assert.True(form.PositionTile.Height >= form.PositionTile.HeightNeeded());
+        });
+    }
+
+    [Fact]
+    public void TheSheetMap_IsLeftOfTheLabel_WhenThePreviewIsWiderThanHigh_OtherwiseBelowIt()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            LabelPreview preview = window.Form.Preview;
+
+            var (label, map) = preview.SplitLabelAndMap(new Rectangle(0, 0, 600, 300), drawMap: true);
+            Assert.True(map.Right < label.Left, "the map is left of the label");
+            Assert.InRange(map.Width / (double)(map.Width + label.Width), 0.38, 0.42); // 40 % of the width
+            Assert.Equal(map.Height, label.Height);
+
+            (label, map) = preview.SplitLabelAndMap(new Rectangle(0, 0, 300, 600), drawMap: true);
+            Assert.True(map.Top > label.Bottom, "a narrow preview: the map below the label");
+
+            (label, map) = preview.SplitLabelAndMap(new Rectangle(0, 0, 600, 300), drawMap: false);
+            Assert.Equal(new Rectangle(0, 0, 600, 300), label); // no map (the board is shown): all for the label
+            Assert.True(map.IsEmpty);
+        });
+    }
+
+    [Fact]
+    public void TheVersion_IsShownAsInTheProjectFile_WithoutTheBuildsCommitNumber()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            Assert.Equal(Strings.AppVersion(AppInfo.Version), window.Form.VersionLabel.Text);
+            Assert.DoesNotContain("+", AppInfo.Version); // "2.0.0-alpha", not "2.0.0-alpha+3f2a…"
+            Assert.Matches(@"^\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$", AppInfo.Version);
+        });
+    }
+
+    [Fact]
+    public void ThePrintButton_IsAtTheBottomRight_WithItsIconAndText_AndOnlyWhenThereIsALabel()
     {
         Sta.Run(() =>
         {
@@ -477,30 +632,19 @@ public class MainFormTests
             window.Pump();
 
             Assert.True(form.PrintButton.Visible && form.NextButton.Visible);
-            Assert.True(Top(form.NextButton) >= Top(form.Preview) + form.Preview.Height, "below the preview");
-            Assert.Equal(2 * form.XmlViewButton.Height, form.NextButton.Height); // twice a normal button
-            Assert.Equal(form.NextButton.Size, form.PreviousButton.Size);
-            Assert.Equal(form.NextButton.Size, form.PrintButton.Size);
-            Assert.Equal(Top(form.NextButton), Top(form.PrintButton));
-            Assert.True(form.PrintButton.PointToScreen(Point.Empty).X > RightEdge(form.NextButton), "print is right of the arrow");
-
-            // The counter against the preview's left edge, print against its right edge, the arrows in the middle.
-            int previewLeft = form.Preview.PointToScreen(Point.Empty).X;
-            Assert.Equal(previewLeft, form.LabelCounter.PointToScreen(Point.Empty).X);
-            Assert.Equal(RightEdge(form.Preview), RightEdge(form.PrintButton));
-            int previewMiddle = previewLeft + form.Preview.Width / 2;
-            int arrowsMiddle = (form.PreviousButton.PointToScreen(Point.Empty).X + RightEdge(form.NextButton)) / 2;
-            Assert.InRange(Math.Abs(previewMiddle - arrowsMiddle), 0, 3);
-            Assert.True(RightEdge(form.LabelCounter) < form.PreviousButton.PointToScreen(Point.Empty).X, "the counter is left of the arrows");
-            Assert.True(form.LabelCounter.Font.Bold, "the counter is bold");
-
-            Assert.NotNull(form.PrintButton.Image);
+            Assert.True(Top(form.PrintButton) >= Bottom(form.Tiles), "in the bottom bar, below the panels");
+            Assert.True(form.PrintButton.Height >= form.LogicalToDeviceUnits(56), "big enough for a finger");
+            Assert.InRange(Top(form.PrintButton) + form.PrintButton.Height / 2 - (Top(form.NextButton) + form.NextButton.Height / 2), -1, 1);
+            Assert.True(Left(form.PrintButton) > RightEdge(form.NextButton), "print is right of the arrows");
+            Assert.Equal(Strings.PrintButtonText, form.PrintButton.Text);
+            Assert.Null(form.PrintButton.Image); // the printer of the mockup is drawn in code, not a picture
             Assert.False(form.PrintButton.TabStop); // Tab only goes through the four fields
+            Assert.True(form.LabelCounter.Font.Bold, "the counter is bold");
         });
     }
 
     [Fact]
-    public void TheArrowsAndPrint_AreWiderThanBefore_AndGrowWithThePreview_ButNotTooMuch()
+    public void TheBottomBar_FollowsTheWindowsWidth_PrintStaysAtTheRight_TheArrowsAtTheEndOfTheBand()
     {
         Sta.Run(() =>
         {
@@ -508,29 +652,20 @@ public class MainFormTests
             MainForm form = window.Form;
             form.OpenLabelFiles(Samples.File(Samples.LabelXml), null);
             window.Pump();
+            Size disc = form.NextButton.Size;
 
-            int height = form.NextButton.Height;
-            int standard = form.NextButton.Width;
-            Assert.True(standard > 72, "wider than the 72 of 1.1.1: " + standard); // the standard window, at 100%
-
-            form.Width += 400; // the preview column grows
-            window.Pump();
-            Assert.True(form.NextButton.Width > standard, $"{form.NextButton.Width} after {standard}");
-            Assert.Equal(height, form.NextButton.Height); // the height stays
-
-            form.Width += 2000; // a very wide window: not wider than the maximum
-            window.Pump();
-            Assert.Equal(120, form.NextButton.Width);
-            foreach (Button button in new[] { form.PreviousButton, form.PrintButton })
+            foreach (int wider in new[] { 0, 400, 1200 })
             {
-                Assert.Equal(form.NextButton.Size, button.Size);
-            }
+                form.Width += wider;
+                window.Pump();
 
-            form.DragColumnDivider(form.Workspace.Width); // the preview as narrow as it can be: everything still fits
-            window.Pump();
-            Assert.True(RightEdge(form.LabelCounter) < form.PreviousButton.PointToScreen(Point.Empty).X);
-            Assert.True(RightEdge(form.NextButton) < form.PrintButton.PointToScreen(Point.Empty).X);
-            Assert.Equal(RightEdge(form.Preview), RightEdge(form.PrintButton));
+                int pad = form.LogicalToDeviceUnits(24);
+                Assert.Equal(RightEdge(form.BottomBar) - pad, RightEdge(form.PrintButton));
+                Assert.Equal(form.PrintButton.Left - pad, form.BottomBar.BandRight);
+                // "next" in the middle of the band's round end
+                Assert.InRange(form.NextButton.Left + form.NextButton.Width / 2 - (form.BottomBar.BandRight - form.BottomBar.Height / 2), -1, 1);
+                Assert.Equal(disc, form.NextButton.Size); // the round buttons keep their size
+            }
         });
     }
 
@@ -677,12 +812,12 @@ public class MainFormTests
         Sta.Run(() =>
         {
             Rectangle area = Screen.PrimaryScreen!.WorkingArea;
-            var settings = new AppSettings { WindowLeft = area.Left + 40, WindowTop = area.Top + 30, WindowWidth = 900, WindowHeight = 640 };
+            var settings = new AppSettings { WindowLeft = area.Left + 40, WindowTop = area.Top + 30, WindowWidth = 1000, WindowHeight = 680 };
             using var window = new Window(settings);
             MainForm form = window.Form;
 
             Assert.Equal(new Point(area.Left + 40, area.Top + 30), form.Location);
-            Assert.Equal(new Size(900, 640), form.Size); // the test process runs at 100%
+            Assert.Equal(new Size(1000, 680), form.Size); // the test process runs at 100%
             Assert.Equal(FormWindowState.Normal, form.WindowState);
 
             // Moved and made bigger, then closed: remembered for the next start.
@@ -702,7 +837,7 @@ public class MainFormTests
         Sta.Run(() =>
         {
             Rectangle area = Screen.PrimaryScreen!.WorkingArea;
-            var settings = new AppSettings { WindowLeft = area.Left + 40, WindowTop = area.Top + 30, WindowWidth = 900, WindowHeight = 640, WindowMaximized = true };
+            var settings = new AppSettings { WindowLeft = area.Left + 40, WindowTop = area.Top + 30, WindowWidth = 1000, WindowHeight = 680, WindowMaximized = true };
             using var window = new Window(settings);
 
             Assert.Equal(FormWindowState.Maximized, window.Form.WindowState);
@@ -710,7 +845,7 @@ public class MainFormTests
             window.Form.Close();
 
             Assert.True(settings.WindowMaximized);
-            Assert.Equal((900, 640), (settings.WindowWidth, settings.WindowHeight)); // the size to go back to
+            Assert.Equal((1000, 680), (settings.WindowWidth, settings.WindowHeight)); // the size to go back to
         });
     }
 
@@ -752,19 +887,19 @@ public class MainFormTests
     }
 
     [Fact]
-    public void Row1_StartsWithTheFileLines_AndOnlyTheLineBelowTheLanguageIsLeft()
+    public void TheFilesPanel_HasItsTitleAboveTheFileLines_AndTheTwoBigPanelsBelowIt()
     {
         Sta.Run(() =>
         {
             using var window = new Window();
             MainForm form = window.Form;
 
-            // The description is no longer a text above the path boxes (it is the hover text of the "?" icons), and the
-            // divider between row 1 and row 2 is gone (Daan, 2026-10-26).
-            Panel divider = Assert.Single(form.Dividers);
-            int belowDivider = Top(divider) + divider.Height;
-            Assert.InRange(Top(form.XmlFileBox.Parent!) - belowDivider, 0, 20);
-            Assert.True(Top(form.EditorCaption) > Top(form.FileStatus) + form.FileStatus.Height, "room between the status line and row 2");
+            // The description of the two kinds of files is the hover text of the "?" icons (Daan, 2026-10-26).
+            Assert.Equal(Strings.FilesCaption, form.FilesCaption.Text);
+            Assert.True(Top(form.FilesCaption) > Bottom(form.TopBar));
+            Assert.InRange(Top(form.XmlFileBox.Parent!) - Bottom(form.FilesCaption), 0, form.LogicalToDeviceUnits(20));
+            Assert.True(Top(form.EditorCaption) > Bottom(form.CsvBrowseButton), "room between the file lines and the panels");
+            Assert.Equal(Left(form.FilesCaption), Left(form.XmlFoldButton)); // the title and the lines start in line
         });
     }
 
@@ -772,27 +907,107 @@ public class MainFormTests
     [InlineData(AppLanguage.Dutch)]
     [InlineData(AppLanguage.French)]
     [InlineData(AppLanguage.English)]
-    public void TheHowToIcons_SitBeforeTheCaptions_AndShowTheDescription(AppLanguage language)
+    public void TheOneHowToIcon_SitsRightAfterTheTitle_AndShowsTheDescription(AppLanguage language)
     {
         Sta.Run(() =>
         {
             using var scope = new LanguageScope(language);
             using var window = new Window();
             MainForm form = window.Form;
+            PictureBox icon = form.FilesHowToPicture;
 
-            foreach ((PictureBox icon, Label caption) in new[] { (form.XmlHowToPicture, form.XmlFileCaption), (form.CsvHowToPicture, form.CsvFileCaption) })
-            {
-                Assert.NotNull(icon.Image);
-                Assert.Equal(form.UserGuidePicture.Size, icon.Size); // the same small icon size as the user guide
-                Assert.True(RightEdge(icon) <= caption.PointToScreen(Point.Empty).X, "the icon comes before the caption");
-                Assert.InRange(Top(icon) + icon.Height / 2 - (Top(caption) + caption.Height / 2), -1, 1); // in line with it
+            // Daan, 2026-11-21: one "?" after "Label files" instead of one before each file line.
+            Assert.NotNull(icon.Image);
+            Assert.Equal(icon.Width, icon.Height); // a round icon, not stretched
+            Assert.InRange(Left(icon) - RightEdge(form.FilesCaption), 0, form.LogicalToDeviceUnits(12)); // right after the title
+            Assert.InRange(Top(icon) + icon.Height / 2 - (Top(form.FilesCaption) + form.FilesCaption.Height / 2), -1, 1); // in line with it
+            Assert.Equal(MainForm.WrapForToolTip(Strings.FileDescription, MainForm.HowToLineLength), form.HowToToolTip.GetToolTip(icon));
 
-                string? tip = form.HowToToolTip.GetToolTip(icon);
-                Assert.Equal(MainForm.WrapForToolTip(Strings.FileDescription, MainForm.HowToLineLength), tip);
-            }
+            // The fold buttons start at the left edge of the panel's content, like the status line below them.
+            Assert.Equal(Left(form.XmlFoldButton), Left(form.CsvFoldButton));
+        });
+    }
 
-            // The icons start at the left edge of the window's content, like the status line below them.
-            Assert.Equal(form.XmlHowToPicture.PointToScreen(Point.Empty).X, form.FileStatus.PointToScreen(Point.Empty).X);
+    [Fact]
+    public void AFoldedFileLine_ShowsOnlyItsCaptionAndPath_GivesThePanelsBelowMoreHeight_AndIsRemembered()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+            form.OpenLabelFiles(Samples.File(Samples.Template), Samples.File(Samples.Csv));
+            window.Pump();
+            int previewHeight = form.Preview.Height;
+            int saves = window.SaveCount;
+
+            form.XmlFoldButton.PerformClick(); // Daan, 2026-11-21: the "v" folds the line up
+            window.Pump();
+            Assert.True(form.XmlFoldButton.Folded);
+            Assert.False(form.XmlFileBox.Visible || form.XmlBrowseButton.Visible);
+            Assert.True(form.XmlFoldedName.Visible);
+            Assert.Equal(form.XmlFileBox.Text, form.XmlFoldedName.Text);
+            Assert.True(form.XmlFileCaption.Visible, "the caption stays, to know what to unfold");
+            Assert.True(form.Preview.Height > previewHeight, "the panels below get the height");
+            Assert.True(window.Settings.XmlFileLineFolded);
+            Assert.True(window.SaveCount > saves);
+
+            form.CsvFoldButton.PerformClick();
+            window.Pump();
+            int bothFolded = form.Preview.Height;
+            Assert.True(bothFolded >= previewHeight + form.LogicalToDeviceUnits(30), $"{bothFolded} after {previewHeight}");
+            Assert.True(window.Settings.CsvFileLineFolded);
+
+            form.XmlFoldButton.PerformClick(); // open again
+            form.CsvFoldButton.PerformClick();
+            window.Pump();
+            Assert.True(form.XmlFileBox.Visible && form.XmlBrowseButton.Visible);
+            Assert.Equal(previewHeight, form.Preview.Height);
+            Assert.False(window.Settings.XmlFileLineFolded || window.Settings.CsvFileLineFolded);
+        });
+
+        Sta.Run(() =>
+        {
+            using var window = new Window(new AppSettings { CsvFileLineFolded = true }); // folded the last time
+            Assert.True(window.Form.CsvFoldButton.Folded);
+            Assert.False(window.Form.CsvFileBox.Visible);
+            Assert.False(window.Form.XmlFoldButton.Folded);
+        });
+    }
+
+    [Fact]
+    public void TheCsvTableTitle_EndsWithTheCsvsFileName_InBold()
+    {
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+            form.OpenLabelFiles(Samples.File(Samples.Template), Samples.File(Samples.Csv));
+            window.Pump();
+
+            // Daan, 2026-11-21: "Données : label-example.csv | 3 étiquette(s)", the file name bold.
+            Assert.Equal(Strings.CsvCaption, form.EditorCaption.Text);
+            Assert.Equal(Samples.Csv, form.EditorCaption.Emphasis);
+            Assert.Equal(Strings.LabelCount(3), form.EditorCaption.Suffix);
+
+            form.XmlViewButton.PerformClick(); // the template text: no file name, no count
+            Assert.Equal(Strings.EditorCaption, form.EditorCaption.Text);
+            Assert.Equal("", form.EditorCaption.Emphasis);
+            Assert.Equal("", form.EditorCaption.Suffix);
+
+            form.BoardButton.PerformClick(); // the board: the same title as the table
+            Assert.Equal(Strings.CsvCaption, form.EditorCaption.Text);
+            Assert.Equal(Samples.Csv, form.EditorCaption.Emphasis);
+            Assert.Equal(Strings.LabelCount(3), form.EditorCaption.Suffix);
+        });
+
+        Sta.Run(() =>
+        {
+            using var window = new Window();
+            MainForm form = window.Form;
+            form.OpenLabelFiles(Samples.File(Samples.LabelXml), null); // a label-xml on the board: its own name
+            form.BoardButton.PerformClick();
+            Assert.Equal(Samples.LabelXml, form.EditorCaption.Emphasis);
+            Assert.Equal(Strings.LabelCount(2), form.EditorCaption.Suffix);
         });
     }
 
@@ -858,15 +1073,30 @@ public class MainFormTests
     }
 
     [Fact]
-    public void TheBanner_KeepsTheProportionsOfThePicture()
+    public void TheTitleTab_ShowsTheNameAndTheSubtitle_WholeInTheStandardWindow_AndTheTopBarHoldsTheRest()
     {
         Sta.Run(() =>
         {
             using var window = new Window();
-            PictureBox banner = window.Form.BannerPicture;
+            MainForm form = window.Form;
 
-            Assert.Equal(new Size(1080, 168), banner.Image!.Size); // drawn at twice 540 x 84, like TsDssConverter's banner
-            Assert.Equal(540.0 / 84.0, (double)banner.Width / banner.Height, 1);
+            Assert.Equal(Strings.AppName, form.TitleTab.Text);
+            Assert.Equal(Strings.BannerSubtitle, form.TitleTab.Subtitle);
+            Assert.True(form.TitleTab.WidthNeeded() <= form.TitleTab.Width, "nothing cut off in the standard window");
+            Assert.Equal(form.TitleTab.WidthNeeded(), form.TitleTab.TabBounds().Width);
+
+            // Right of it, in this order: the language, the credit and the version, the logo, the user guide.
+            foreach (Control control in new Control[] { form.LanguageBox, form.VersionLabel, form.LogoPicture, form.UserGuideButton })
+            {
+                Assert.True(form.TopBar.Contains(control));
+                Assert.True(Left(control) >= Left(form.TitleTab) + form.TitleTab.WidthNeeded(), "right of the white tab");
+            }
+
+            Assert.True(RightEdge(form.LanguageBox) < Left(form.VersionLabel));
+            Assert.True(RightEdge(form.VersionLabel) < Left(form.LogoPicture));
+            Assert.True(RightEdge(form.LogoPicture) < Left(form.UserGuideButton));
+            Assert.Equal(RightEdge(form.CreditLabel), RightEdge(form.VersionLabel)); // two lines, against the right
+            Assert.True(RightEdge(form.UserGuideButton) <= RightEdge(form.TopBar));
         });
     }
 
@@ -882,11 +1112,17 @@ public class MainFormTests
             using var window = new Window();
             MainForm form = window.Form;
 
-            foreach (Button button in new Button[] { form.XmlBrowseButton, form.CsvBrowseButton, form.SaveButton, form.XmlViewButton, form.PreviousButton, form.NextButton })
+            int needed = TextRenderer.MeasureText(form.SaveButton.Text, form.SaveButton.Font).Width;
+            Assert.True(needed + 8 <= form.SaveButton.Width, $"'{form.SaveButton.Text}' needs {needed} in a button of {form.SaveButton.Width}");
+            foreach (RoundedButton browse in new[] { form.XmlBrowseButton, form.CsvBrowseButton })
             {
-                int needed = TextRenderer.MeasureText(button.Text, button.Font).Width;
-                Assert.True(needed + 8 <= button.Width, $"'{button.Text}' needs {needed} in a button of {button.Width}");
+                Assert.True(browse.WidthNeededForIconAndText() <= browse.Width, $"'{browse.Text}' and its folder in {browse.Width}");
             }
+
+            TabButton xml = form.XmlViewButton;
+            Assert.True(xml.WidthNeeded() <= xml.Width, $"'{xml.Text}' (bold) needs {xml.WidthNeeded()} in a tab of {xml.Width}");
+
+            Assert.True(form.PrintButton.WidthNeeded() <= form.PrintButton.Width, $"'{form.PrintButton.Text}' in {form.PrintButton.Width}");
         });
     }
 
@@ -903,8 +1139,8 @@ public class MainFormTests
 
             Assert.Equal("Save template", window.Form.SaveButton.Text);
             Assert.Equal(MainForm.WrapForToolTip(Strings.FileDescription, MainForm.HowToLineLength),
-                window.Form.HowToToolTip.GetToolTip(window.Form.CsvHowToPicture));
-            Assert.Equal(Strings.StatusNothingOpen, window.Form.FileStatus.Text);
+                window.Form.HowToToolTip.GetToolTip(window.Form.FilesHowToPicture));
+            Assert.Equal(Strings.PreviewCaption, window.Form.PreviewCaption.Text);
             Assert.Equal("en", window.Settings.Language);
             Assert.True(window.SaveCount > 0);
         });
@@ -927,10 +1163,10 @@ public class MainFormTests
             window.Pump();
 
             Control sizeFrame = form.LabelWidthBox.Parent!;
-            Assert.Equal(RightEdge(form.Preview), RightEdge(sizeFrame));
-            Assert.Equal(Top(form.XmlViewButton), Top(sizeFrame)); // in the title row, in line with the view button
+            Assert.Equal(RightEdge(form.Preview) - form.LogicalToDeviceUnits(12), RightEdge(sizeFrame));
+            int sizeMiddle = Top(sizeFrame) + sizeFrame.Height / 2, tabMiddle = Top(form.XmlViewButton) + form.XmlViewButton.Height / 2;
+            Assert.InRange(sizeMiddle - tabMiddle, -1, 1); // in the title row, in line with the tabs of the left panel
             Assert.True(RightEdge(form.PreviewCaption) <= form.LabelSizePanel.PointToScreen(Point.Empty).X, "the title runs into the label size");
-            Assert.Equal(form.XmlBrowseButton.Parent!.Width, form.FileStatus.Width);
         });
     }
 
@@ -975,7 +1211,7 @@ public class MainFormTests
             Assert.Equal(new SizeF(100, 100), form.Preview.LabelSize);
 
             form.LabelLengthBox.Text = "70";
-            Assert.Equal(Theme.Navy, form.LabelLengthBox.ForeColor);
+            Assert.Equal(Theme.Text, form.LabelLengthBox.ForeColor);
         });
     }
 
@@ -1015,7 +1251,6 @@ public class MainFormTests
             Assert.Equal("1 / 2", form.LabelCounter.Text);
             Assert.False(form.PreviousButton.Enabled); // at the first label
             Assert.True(form.NextButton.Enabled);
-            Assert.Equal(Strings.StatusLabelXml(2), form.FileStatus.Text);
 
             form.NextButton.PerformClick();
 
@@ -1044,7 +1279,7 @@ public class MainFormTests
             Assert.Equal("1 / 3", form.LabelCounter.Text);
             Assert.Equal(template, form.XmlFileBox.Text);   // the editor holds the template
             Assert.Equal(csv, form.CsvFileBox.Text);
-            Assert.Equal(Strings.StatusTemplateWithCsv(3), form.FileStatus.Text);
+            Assert.Equal(Strings.LabelCount(3), form.EditorCaption.Suffix); // "Données : label-example.csv | 3 étiquette(s)"
             Assert.Equal(template, window.Settings.LastFile);
             Assert.Equal(csv, window.Settings.LastCsvFile);
             Assert.Contains("$ORDERNO$", form.Editor.Text);
@@ -1063,7 +1298,6 @@ public class MainFormTests
 
             Assert.Equal(1, form.Preview.Count);
             Assert.False(form.NextButton.Visible || form.PreviousButton.Visible || form.LabelCounter.Visible);
-            Assert.Equal(Strings.StatusTemplateWithoutCsv, form.FileStatus.Text);
             Assert.Equal("", window.Settings.LastCsvFile);
         });
     }
@@ -1106,7 +1340,6 @@ public class MainFormTests
             window.Pump(); // paints the preview with the error
 
             Assert.NotNull(window.Form.Preview.Labels!.Error);
-            Assert.Equal(Strings.StatusXmlError, window.Form.FileStatus.Text);
             Assert.False(window.Form.NextButton.Visible);
         });
     }

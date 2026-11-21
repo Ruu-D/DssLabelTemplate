@@ -58,6 +58,12 @@ public class LocalizationTests
         return texts;
     }
 
+    /// <summary>
+    /// Texts that are the same in Dutch and English on purpose: "Label" (the right panel's title) and "13 label(s)" (after
+    /// the file name in the left panel's title), Daan 2026-11-21.
+    /// </summary>
+    private static readonly string[] SameInDutchAndEnglish = { nameof(Strings.PreviewCaption), nameof(Strings.LabelCount) };
+
     [Fact]
     public void EveryText_ExistsInAllThreeLanguages_AndIsTranslated()
     {
@@ -83,7 +89,7 @@ public class LocalizationTests
                     Assert.True(text.Contains(marker), $"{name} in {language} does not show its argument {marker}");
                 }
 
-                if (language != AppLanguage.Dutch)
+                if (language != AppLanguage.Dutch && !(language == AppLanguage.English && SameInDutchAndEnglish.Contains(name)))
                 {
                     Assert.True(text != dutch, $"{name} in {language} is still the Dutch text");
                 }

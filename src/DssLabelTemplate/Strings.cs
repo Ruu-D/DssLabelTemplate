@@ -14,20 +14,24 @@ internal static class Strings
     public const string DeveloperCredit = "Dev.: Daan Verhoost";
     public const string CompanyName = "ROGIERS NV/SA";
     public const string CompanyUrl = "https://www.rogiers.be/";
-    public const string CreditSeparator = " | ";  // between the credit and the app version, top right
     public const string UserGuideUrl = "https://github.com/Ruu-D/DssLabelTemplate/"; // opened by the user-guide icon: the GitHub page of this tool
 
-    /// <summary>The line below the program name in the banner. English in every language, like the banner of TsDssConverter.</summary>
+    /// <summary>
+    /// The line below the program name in the title tab at the top left (and in the README banner). English in every
+    /// language, like the banner of TsDssConverter.
+    /// </summary>
     public const string BannerSubtitle = "Visualize, edit and print label files for DUIVESTEIN";
 
-    /// <summary>The two arrows next to the preview title (pictures, the same in every language).</summary>
-    public const string PreviousArrow = "◀";
-    public const string NextArrow = "▶";
+    /// <summary>The tiles below the preview (2.0.0): the same in every language (letters and signs only).</summary>
+    public const string PositionFormat = "X: {0}  |  Y: {1}"; // "X: 410  |  Y: 1787"
+    public const string SheetSizeFormat = "{0} × {1}";       // "2850 × 2100"
+    public const string Millimetres = "mm";
+    public const string NoValue = "–";                       // a tile without a value (nothing open, no sheet)
 
     /// <summary>At the top right of the window, after the credit, e.g. "App version: 0.1.0".</summary>
     public static string AppVersion(string version) => T(
         $"App-versie: {version}",
-        $"Version de l'application : {version}",
+        $"Version app : {version}", // shorter (Daan, 2026-11-21)
         $"App version: {version}");
 
     /// <summary>The tooltip of the user-guide icon right after the app version.</summary>
@@ -43,6 +47,9 @@ internal static class Strings
     public const string LanguageEnglish = "English - Engels";
 
     // ---- Row 1: the two files ----
+    /// <summary>The title of the white panel with the two file lines (2.0.0).</summary>
+    public static string FilesCaption => T("Labelbestanden", "Fichiers d'étiquettes", "Label files");
+
     /// <summary>The hover text of the "?" icons before the path boxes: the two kinds of label files of Duivestein (DSS Software Interface, "Label"). Cut into tooltip lines by MainForm.WrapForToolTip.</summary>
     public static string FileDescription => T(
         "Labeltemplate + label-csv: het template (xml) beschrijft de opmaak van één label, met variabelen zoals $LENGTH$; de " +
@@ -72,6 +79,14 @@ internal static class Strings
 
     public static string Browse => T("Bladeren…", "Parcourir…", "Browse…");
 
+    /// <summary>The "v" before each file line (Daan, 2026-11-21): fold the line up (only its caption and file name), or open it.</summary>
+    public static string FoldFileLine => T(
+        "Regel inklappen (meer plaats voor de tabel en het label)",
+        "Replier la ligne (plus de place pour le tableau et l'étiquette)",
+        "Fold the line up (more room for the table and the label)");
+
+    public static string UnfoldFileLine => T("Regel openklappen", "Déplier la ligne", "Unfold the line");
+
     /// <summary>The file type of the upper Browse button and of saving a new text ("text|pattern", an OpenFileDialog filter).</summary>
     public static string XmlFileFilter => T(
         "Labeltemplate of label-xml (*.xml)|*.xml",
@@ -80,35 +95,7 @@ internal static class Strings
 
     public static string CsvFilter => T("Label-csv (*.csv)|*.csv", "CSV d'étiquettes (*.csv)|*.csv", "Label CSV (*.csv)|*.csv");
 
-    // ---- The status line below the files ----
-    public static string StatusNothingOpen => T("Nog geen bestand geopend.", "Aucun fichier ouvert.", "No file opened yet.");
-
-    public static string StatusCsvWithoutTemplate => T(
-        "Label-csv geopend: kies nu het template (xml) erbij.",
-        "CSV d'étiquettes ouvert : choisissez maintenant le modèle (xml).",
-        "Label CSV opened: now choose its template (XML).");
-
-    public static string StatusLabelXml(int labels) => T(
-        $"Label-xml met {labels} label(s).",
-        $"XML d'étiquettes avec {labels} étiquette(s).",
-        $"Label XML with {labels} label(s).");
-
-    public static string StatusTemplateWithCsv(int labels) => T(
-        $"Labeltemplate met de gegevens van de label-csv: {labels} label(s).",
-        $"Modèle d'étiquette avec les données du csv : {labels} étiquette(s).",
-        $"Label template with the data of the label CSV: {labels} label(s).");
-
-    public static string StatusTemplateWithoutCsv => T(
-        "Labeltemplate zonder label-csv: de variabelen ($…$) blijven leeg.",
-        "Modèle d'étiquette sans csv : les variables ($…$) restent vides.",
-        "Label template without a label CSV: the variables ($…$) stay empty.");
-
-    public static string StatusXmlError => T(
-        "Het bestand is (nog) geen geldige xml: zie het voorbeeld.",
-        "Le fichier n'est pas (encore) un xml valide : voir l'aperçu.",
-        "The file is not valid XML (yet): see the preview.");
-
-    // ---- The label size, right of the status line ----
+    // ---- The label size, in the title of the right panel ----
     public static string LabelSizeCaption => T("Labelformaat (mm):", "Format d'étiquette (mm) :", "Label size (mm):");
     public const string LabelSizeTimes = "×";
 
@@ -124,13 +111,21 @@ internal static class Strings
 
     // ---- Row 2: the two columns ----
     public static string EditorCaption => T("Tekst van het template", "Texte du modèle", "Template text");
-    public static string CsvCaption => T("Gegevens (alleen lezen)", "Données (lecture seule)", "Data (read-only)");
+    /// <summary>
+    /// The title of the csv table AND of the board, followed by the file name in bold and the number of labels (Daan,
+    /// 2026-11-21): "Gegevens : X.csv | 13 label(s)". (It replaces the status line below the files and the board's own title.)
+    /// </summary>
+    public static string CsvCaption => T("Gegevens :", "Données :", "Data :");
+
+    /// <summary>After the file name in that title: "13 label(s)". The same in Dutch and English on purpose.</summary>
+    public static string LabelCount(int labels) => T($"{labels} label(s)", $"{labels} étiquette(s)", $"{labels} label(s)");
 
     /// <summary>
-    /// Only with a label-csv: the button above the left column (the template text) and the tooltip of the csv icon button
-    /// below it (the csv data; was a text button above the column until 2026-11-08).
+    /// The tab in the title of the left panel (2.0.0): the template text (only with a label-csv). The csv table and the
+    /// board are chosen with the round buttons of the bottom bar; the csv button shows "CSV" and has the tooltip below.
     /// </summary>
     public static string XmlViewButton => T("Template (xml)", "Modèle (xml)", "Template (XML)");
+    public const string CsvSign = "CSV";
     public static string CsvViewTooltip => T(
         "Label-csv: de gegevens als tabel in de linkerkolom",
         "CSV d'étiquettes : les données en tableau dans la colonne de gauche",
@@ -138,12 +133,12 @@ internal static class Strings
 
     /// <summary>The first column of the csv table: the number of the label, as in "2 / 3" above the preview.</summary>
     public const string CsvNumberColumn = "#";
-    public static string PreviewCaption => T("Voorbeeld van het label", "Aperçu de l'étiquette", "Label preview");
+    /// <summary>The title of the right panel: simply the word for "label" (Daan, 2026-11-21; was "Label preview").</summary>
+    public static string PreviewCaption => T("Label", "Étiquette", "Label");
     public static string PreviousLabel => T("Vorig label", "Étiquette précédente", "Previous label");
     public static string NextLabel => T("Volgend label", "Étiquette suivante", "Next label");
 
-    /// <summary>The board view in the left column (the "View board" button left of the arrows): its title and tooltip.</summary>
-    public static string BoardCaption => T("Plaat met de labelposities", "Panneau avec les positions des étiquettes", "Board with the label positions");
+    /// <summary>The board view in the left column (the round board button): its tooltip. Its title is <see cref="CsvCaption"/>.</summary>
     public static string BoardTooltip => T(
         "Plaat tonen: alle labelposities in de linkerkolom (nog eens klikken: terug naar de tabel)",
         "Afficher le panneau : toutes les positions des étiquettes dans la colonne de gauche (cliquer à nouveau : retour au tableau)",
@@ -153,7 +148,26 @@ internal static class Strings
         "Ces étiquettes n'ont pas de format de panneau : il n'y a pas de panneau à afficher.",
         "These labels have no sheet size: there is no board to show.");
 
-    /// <summary>The tooltip of the print button right of the arrows.</summary>
+    /// <summary>Below the board (2.0.0, Daan's mockup): what a tap does.</summary>
+    public static string BoardHint => T(
+        "· Tik op een label om het te tonen ·",
+        "· Touchez une étiquette pour l'afficher ·",
+        "· Tap a label to show it ·");
+
+    /// <summary>The two tiles below the preview (2.0.0): where the shown label sits, and the size of its sheet.</summary>
+    public static string PositionTile => T("Positie", "Position", "Position");
+    public static string SheetTile => T("Plaat", "Panneau", "Sheet");
+
+    /// <summary>The last line of the position tile, e.g. "LabelID 1608 | rotatie 0°".</summary>
+    public static string LabelDetails(string id, string rotation) => T(
+        $"LabelID {id}  |  rotatie {rotation}°",
+        $"LabelID {id}  |  rotation {rotation}°",
+        $"Label ID {id}  |  rotation {rotation}°");
+
+    /// <summary>The text of the print button at the bottom right (2.0.0; was a printer icon only).</summary>
+    public static string PrintButtonText => T("Afdrukken", "Imprimer", "Print");
+
+    /// <summary>The tooltip of the print button.</summary>
     public static string PrintTooltip => T(
         "Label(s) afdrukken… (Ctrl+P)",
         "Imprimer l'étiquette / les étiquettes… (Ctrl+P)",
@@ -199,17 +213,6 @@ internal static class Strings
         "Le csv d'étiquettes ne contient aucune étiquette (seulement l'en-tête).",
         "The label CSV has no labels (only a header line).");
 
-    /// <summary>Below the label: where it sits on the sheet.</summary>
-    public static string LabelInfo(string id, string x, string y, string rotation) => T(
-        $"ID {id}  ·  X {x}  ·  Y {y}  ·  rotatie {rotation}°",
-        $"ID {id}  ·  X {x}  ·  Y {y}  ·  rotation {rotation}°",
-        $"ID {id}  ·  X {x}  ·  Y {y}  ·  rotation {rotation}°");
-
-    public static string SheetInfo(string length, string width) => T(
-        $"plaat {length} × {width} mm",
-        $"panneau {length} × {width} mm",
-        $"sheet {length} × {width} mm");
-
     /// <summary>A print object that could not be drawn (a number is missing or wrong), e.g. "&lt;Text&gt; on line 5".</summary>
     public static string ObjectNotDrawn(string objectName, int line) => T(
         $"<{objectName}> op regel {line}",
@@ -233,7 +236,7 @@ internal static class Strings
         $"{count} object(s) (partly) outside the label");
 
     // ---- Saving ----
-    /// <summary>The blue button above the editor, only shown when the text was changed.</summary>
+    /// <summary>The navy button just below "Template (xml)", only shown when the text was changed.</summary>
     public static string SaveTemplate => T("Template opslaan", "Enregistrer le modèle", "Save template");
 
     // ---- Questions and messages ----

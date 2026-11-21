@@ -6,31 +6,34 @@ DssLabelTemplate is a small Windows tool for the label files of a Duivestein war
 printed, shows where it sits on the sheet, lets you edit the label layout, and reprints a damaged label at the unloading belt.
 Sister tool: **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (writes the label CSV files for the warehouse).
 
-> **Status:** version **1.2.1** (2026-11-19). Printing on the reprint printer (Zebra ZD220) works; real-world use at the
-> customer is going on. Full history: [CHANGELOG.md](CHANGELOG.md).
+> **Status:** version **2.0.0** (2026-11-21), the first customer release in the new look. Printing on the reprint printer
+> (Zebra ZD220) works; real-world use at the customer is going on. Full history: [CHANGELOG.md](CHANGELOG.md).
 
 ## At a glance
 
 - **One file**, `DssLabelTemplate.exe`: no installer, no .NET installation, no Excel or Office. It lives in
   `C:\DssLabelTemplate\`, together with `settings.json` and example label files.
 - **Made for a touch screen:** big buttons, a large label preview, and a board view where a tap on a label shows it.
+- **Looks like the machine software** the operators use all day (SCM Maestro): its colours, its round buttons, its own
+  title bar with a clock. F11 shows it full screen.
 - **Dutch, French and English** interface.
 - Files are saved back in their own encoding and line endings; the label CSV itself is never changed.
 
 ## What it looks like
 
-Left the data of the label CSV (or the template text), right the label as it will be printed, with below it the sheet and
-all its labels:
+At the top the two label files; below them, left the data of the label CSV (or the template text), right the label as it
+will be printed with the sheet beside it, and under it where the label sits on the sheet:
 
 <p align="center">
-  <img src="media/preview/MainUI-preview.png" width="720" alt="The DssLabelTemplate window in English: the template and label CSV at the top, the CSV data as a table on the left, and on the right the preview of label 3 of 13 with the small sheet map below it.">
+  <img src="media/preview/MainUI-preview.png" width="720" alt="The DssLabelTemplate window in English: the title bar with the clock and window buttons, the template and label CSV at the top, the CSV data as a table on the left with its file name and 13 labels in the title, on the right label 3 of 13 with the small sheet map beside it and two tiles with its position and sheet size, and the blue bar with round buttons at the bottom.">
 </p>
 
-The two buttons below the left column switch between the **CSV table** and the **board view**. The board shows the whole
-sheet with every label position; the label in the preview is highlighted, and tapping another label shows that one:
+The round buttons at the bottom left switch between the **CSV table** and the **board view** (the open one is bigger,
+with a line under it). The board shows the whole sheet with every label position; the shown label is highlighted, and
+tapping another label shows that one:
 
 <p align="center">
-  <img src="media/preview/Board-preview.png" width="720" alt="The board view: the left column shows the whole sheet with all label positions, the shown label highlighted; the label preview on the right is bigger.">
+  <img src="media/preview/Board-preview.png" width="720" alt="The board view: the left panel shows the whole sheet with all label positions, the shown label highlighted; the label on the right is bigger, without the small sheet map.">
 </p>
 
 ## What it does
@@ -55,11 +58,12 @@ sheet with every label position; the label in the preview is highlighted, and ta
 | 1.1.3 – 1.1.4 | 2026-10-26 / 27 | Turned preview and print, printing without the Windows dialog, CSV columns in your own order |
 | 1.1.5 | 2026-11-08 | `settings.json` can be edited while the program runs (see below) |
 | 1.2.0 | 2026-11-08 | **Board view** with tap-to-show, bigger touch buttons, adjustable CSV table size |
+| 2.0.0 | 2026-11-21 | **New look** ("Maestro" skin, like the SCM machine software the operators use), own title bar with clock, F11 full screen, foldable file lines; the same functions |
 
 ## Settings that are only in `settings.json`
 
 The language and the label size are set in the window. Other settings are only in `C:\DssLabelTemplate\settings.json`:
-**Shift+click on the ROGIERS logo** (bottom left of the window) opens it in Notepad. A saved change is used as soon as you
+**Shift+click on the ROGIERS logo** (top right of the window, next to the "?") opens it in Notepad. A saved change is used as soon as you
 click back into the window, and is never overwritten by the program. The `README.md` in that folder explains each one.
 
 | Setting | Default | Meaning |
@@ -76,7 +80,7 @@ click back into the window, and is never overwritten by the program. The `README
 
 ## Good to know
 
-- The label size is not in the label files: it is set in the window (two fields above the preview).
+- The label size is not in the label files: it is set in the window (two fields in the title of the label panel).
 - Barcodes are always printed as Code 128, whatever type the template names. QR codes are real and scannable.
 - The paper size of the label printer is set in its driver (Windows settings); the program warns when it does not match.
   On the Zebra ZD220, switch dithering OFF in the driver.
@@ -92,7 +96,7 @@ click back into the window, and is never overwritten by the program. The `README
 ## Technology
 
 C# on .NET 10 with Windows Forms; [Scintilla.NET](https://github.com/desjarlais/Scintilla.NET) (`Scintilla5.NET`, MIT licence)
-for the editor and [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence) for the QR codes. 233 automated tests (xUnit).
+for the editor and [QRCoder](https://github.com/Shane32/QRCoder) (MIT licence) for the QR codes. 244 automated tests (xUnit).
 
 ## Credits
 

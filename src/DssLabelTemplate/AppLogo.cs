@@ -5,8 +5,8 @@ namespace DssLabelTemplate;
 
 /// <summary>
 /// The logo of the program, drawn in code: a white label (sticker) with a QR-code-like pattern and a peeled-off bottom right
-/// corner, with a dark blue shadow. On the app icon it sits on a rounded square in the brand colour; in the banner it sits
-/// on the banner's own brand colour. Only colours of the theme. The same drawing makes the banner AND media\app.ico
+/// corner, with a dark blue shadow. On the app icon it sits on a rounded square in the blue of the window's bottom bar
+/// (2.0.0); in the title tab on a round disc of that blue; in the README banner on the banner's own brand colour. Only colours of the theme. The same drawing makes the banner AND media\app.ico
 /// (see <see cref="IconFileWriter"/>), so the two always match.
 /// </summary>
 internal static class AppLogo
@@ -38,9 +38,11 @@ internal static class AppLogo
 
         if (withBackground)
         {
+            // Since 2.0.0 the blue of the bottom bar (Daan, 2026-11-21), the same gradient from top to bottom; it was the
+            // brand blue of 1.x.
             using GraphicsPath square = FluentDrawing.RoundedRectangle(new RectangleF(2, 2, 96, 96), 18);
-            using var brand = new SolidBrush(Theme.Brand);
-            g.FillPath(brand, square);
+            using var blue = new LinearGradientBrush(new PointF(0, 2), new PointF(0, 98), Theme.BarTop, Theme.BarBottom);
+            g.FillPath(blue, square);
         }
 
         using (GraphicsPath shadow = LabelOutline(LabelLeft + ShadowOffset, LabelTop + ShadowOffset))

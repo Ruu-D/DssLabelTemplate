@@ -129,12 +129,12 @@ public class FileLinesTests
 
             Assert.True(form.OpenCsvFile(csv));
             Assert.Equal(csv, form.CsvFileBox.Text);
-            Assert.Equal(Strings.StatusCsvWithoutTemplate, form.FileStatus.Text);
+            Assert.Equal(0, form.Preview.Count); // a csv without its template: no labels yet (the preview says what to do)
             Assert.Equal("", form.Editor.Text); // the editor is not touched
 
             Assert.True(form.OpenXmlFile(Samples.File(Samples.Template)));
             Assert.Equal(3, form.Preview.Count);
-            Assert.Equal(Strings.StatusTemplateWithCsv(3), form.FileStatus.Text);
+            Assert.Equal(Strings.LabelCount(3), form.EditorCaption.Suffix); // the number of labels in the title
             Assert.Equal(csv, window.Settings.LastCsvFile);
         });
     }
@@ -180,7 +180,6 @@ public class FileLinesTests
             Assert.Null(form.CurrentCsvFile);
             Assert.Equal(1, form.Preview.Count);
             Assert.False(form.ShowingCsv);
-            Assert.Equal(Strings.StatusTemplateWithoutCsv, form.FileStatus.Text);
             Assert.NotNull(form.CurrentFile); // the template stays open
         });
     }

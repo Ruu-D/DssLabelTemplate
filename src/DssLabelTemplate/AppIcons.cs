@@ -79,6 +79,56 @@ internal static class AppIcons
     }
 
     /// <summary>
+    /// The printer in WHITE, for the navy circle of the print button in the bottom bar (2.0.0): the same picture as
+    /// <see cref="Print"/>, every visible pixel made white (its transparency is kept).
+    /// </summary>
+    public static Image PrintWhite()
+    {
+        using Image navy = Print();
+        return InColour(navy, Theme.White);
+    }
+
+    /// <summary>
+    /// A folder (a white outline), drawn in code, before the text of the Browse buttons (2.0.0). Drawn at 64 pixels wide:
+    /// shown 18 high at 100%, so sharp up to about 300%.
+    /// </summary>
+    public static Image Folder()
+    {
+        // The folder of the mockup, on a grid of 24: a tab at the top left, then the body.
+        const float grid = 24, size = 64, scale = size / grid;
+        var folder = new Bitmap((int)size, (int)(14 * scale) + 8);
+        using var graphics = Graphics.FromImage(folder);
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        using var pen = new Pen(Theme.White, 2.2f * scale) { LineJoin = LineJoin.Round };
+        float top = 4; // room for half the pen width
+        PointF[] outline =
+        {
+            new(2 * scale, top), new(8 * scale, top), new(10 * scale, top + 2 * scale), new(22 * scale, top + 2 * scale),
+            new(22 * scale, top + 14 * scale), new(2 * scale, top + 14 * scale),
+        };
+        graphics.DrawPolygon(pen, outline);
+        return folder;
+    }
+
+    /// <summary>A copy of a picture in one colour: every pixel gets <paramref name="colour"/>, its transparency stays.</summary>
+    private static Image InColour(Image picture, Color colour)
+    {
+        var copy = new Bitmap(picture.Width, picture.Height);
+        using var graphics = Graphics.FromImage(copy);
+        using var attributes = new System.Drawing.Imaging.ImageAttributes();
+        attributes.SetColorMatrix(new System.Drawing.Imaging.ColorMatrix(new[]
+        {
+            new float[] { 0, 0, 0, 0, 0 },
+            new float[] { 0, 0, 0, 0, 0 },
+            new float[] { 0, 0, 0, 0, 0 },
+            new float[] { 0, 0, 0, 1, 0 },
+            new float[] { colour.R / 255f, colour.G / 255f, colour.B / 255f, 0, 1 },
+        }));
+        graphics.DrawImage(picture, new Rectangle(0, 0, picture.Width, picture.Height), 0, 0, picture.Width, picture.Height, GraphicsUnit.Pixel, attributes);
+        return copy;
+    }
+
+    /// <summary>
     /// The board icon on the "View board" button left of the arrows (media\Board.png, navy on transparent). Shown as high
     /// as the printer icon, so 72 is enough for a screen at 400%.
     /// </summary>

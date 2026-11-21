@@ -3,15 +3,18 @@ using System.Drawing.Printing;
 namespace DssLabelTemplate;
 
 /// <summary>
-/// The only window of the program. Same look as the settings window of TsDssConverter (banner, language and credit at
-/// the top, logo at the bottom left), with in between:
-///   row 1 (low):  the two label files, each with a path box and a Browse button: the template or label-xml (shown in the
-///                 editor) and the label-csv (the data for a template). Above them what the two kinds of label files are,
-///                 below them a status line (which kind is open, how many labels);
-///   row 2 (high): left the text of the label-xml or template (a simple Notepad) with "Save template" above it after a
-///                 change, right the preview of one label with the label size above it and, at the bottom of the window,
-///                 two big arrows to go through the labels and a big print button (made for a touch screen). The line
-///                 between the two columns can be dragged.
+/// The only window of the program. Since 2.0.0 in the "Maestro" skin (Daan, 2026-11-21: the customer works all day with
+/// the SCM machine software Maestro and wanted the same look; mockup "DssLabelTemplate Maestro skin"). Top to bottom:
+///   the top bar:   at the left a white tab with the logo and the program name; at the right the language, the credit and
+///                  the version, the ROGIERS logo (Shift+click: settings.json) and the round user-guide button;
+///   the files:     a white panel with the two label files, each with a path box and a Browse button: the template or
+///                  label-xml (shown in the editor) and the label-csv (the data for a template), and a status line;
+///   two panels:    left the text of the label-xml or template, the csv table or the board (three tabs in its title, and
+///                  "Save template" just below "Template (xml)" after a change); right the preview of one label on a grey
+///                  work area with the label size in its title, and below it two tiles: where the label sits and its sheet.
+///                  The grey gap between the two panels can be dragged;
+///   the bottom bar: a blue band with round buttons (the csv table, the board, previous, the counter, next) and on the grey
+///                  at its right the print button. Made for a touch screen.
 /// The two kinds of files (DSS Software Interface, "Label"): a label-csv + a label template (the editor shows the template,
 /// the csv gives the data, one label per csv line), or a label-xml (all labels of one sheet in one file).
 /// The layout is built in code, so it can be read and reviewed like any other code.
@@ -24,113 +27,127 @@ internal class MainForm : Form
     private readonly string? _dataFolder; // C:\DssLabelTemplate: the Browse dialogs start in its example folders
     private DateTime _settingsFileTime;   // the date of settings.json when it was last read (see OnActivated)
 
-    // The banner picture is 540 x 84 pixels. It is shown 1.02 times as big (the same as TsDssConverter): 15% smaller than
-    // the 648 x 101 of before (Daan, 2026-11-08). Keep the 540:84 proportions, otherwise blue bars appear.
-    private const int BannerWidth = 551;
-    private const int BannerHeight = 86;
+    // The size of the window when it opens, at 100%. Wider than the 940 x 780 of 1.x: the top bar holds the title tab, the
+    // language, the credit, the logo, the user guide, the clock and the window buttons on one line.
+    private const int WindowWidth = 1180;
+    private const int WindowHeight = 820;
+    private static readonly Size SmallestWindow = new(960, 640);
 
-    // The size of the window when it opens, at 100% (the same as the settings window of TsDssConverter).
-    private const int WindowWidth = 940;
-    private const int WindowHeight = 780;
+    // The window has no Windows frame (Daan, 2026-11-21: "the windows top bar should not be shown"). Around it a thin edge
+    // where it can be resized with the mouse (not while maximised), and the window buttons in the top bar.
+    private const int ResizeEdge = 4;
+    private static readonly Size WindowButtonSize = new(40, 40);
+
+    // The bars and the room around the white panels (at 100%, Daan's mockup scaled to this window).
+    private const int TopBarHeight = 76;
+    private const int PanelGap = 14;       // the grey room between and around the white panels
+    private const int PanelPadding = 16;   // inside a white panel, left of its title
+    private const int HeaderHeight = 44;   // the title row of the two big panels (the tabs are as high)
 
     // The two Browse buttons and the path boxes next to them (Daan, 2026-11-08, "option A"): they are used a lot on the
-    // touch screen, so 44 high (about 1 cm, the usual smallest size for a finger; was 100 x 28 like the normal buttons).
-    private static readonly Size FileButtonSize = new(120, 44);
+    // touch screen, so 44 high (about 1 cm, the usual smallest size for a finger). The width follows the text (FitButtonWidths).
+    private static readonly Size FileButtonSize = new(150, 44);
 
-    // The two arrows and the print button below the preview: twice the size of the 36 x 28 they had next to the title
-    // (Daan, 2026-10-25: easier to hit at the reprint station). This is their SMALLEST size: they grow with the preview
-    // column up to NavigationButtonMaximumWidth (Daan, 2026-10-26: wider arrows, print as wide; FitNavigationButtons).
-    private static readonly Size NavigationButtonSize = new(72, 56);
-    private const int NavigationButtonMaximumWidth = 120;
-    private const int NavigationButtonSmallestWidth = 44; // only with the preview column dragged very narrow and a long counter
-    private const float CounterFontFactor = 1.5f;         // the "2 / 3" below the preview: 1.5 x the window's font (Daan, 2026-11-08)
-    private const int NavigationSideRoom = 12; // at least this much room between an arrow and the counter or print
+    // The round buttons of the bottom bar (the csv table, the board, the arrows) and the print button next to it: big, made
+    // for a touch screen at the reprint station. The counter "2 / 3" between the arrows: twice the window's font, bold.
+    // The csv and board buttons are 20% bigger: their disc is drawn 60 at rest and fills the 72 when it is chosen (Daan,
+    // 2026-11-21), so the button itself never changes size. Below the chosen one the bar draws a short white line.
+    private static readonly Size DiscSize = new(60, 60);
+    private static readonly Size GrowingDiscSize = new(72, 72);
+    private static readonly Size PrintButtonSize = new(170, 56);
+    private const float CounterFontFactor = 2f;
 
-    // Dragging the vertical line: the preview column keeps at least this width (at 100%), so the label size still fits
-    // next to a few letters of its title. (For the editor column see MinimumEditorColumnWidth.)
+    // Dragging the gap between the panels: the preview panel keeps at least this width (at 100%), so the label size still
+    // fits next to a few letters of its title. (For the editor panel see EditorColumnMinimum.)
     private const int MinimumColumnWidth = 330;
 
-    // The two fields of the label size: as high as the buttons, room for "1000,5".
-    private static readonly Size LabelSizeBoxSize = new(60, 28);
+    // The two fields of the label size, in the preview's title: room for "1000,5".
+    private static readonly Size LabelSizeBoxSize = new(56, 32);
 
-    // The "Template (xml)" button above the left column: wide enough for its text (a test checks all languages).
-    private static readonly Size ViewButtonSize = new(120, 28);
+    // "Save template", just below "Template (xml)" (Daan, 2026-11-21), only after a change. Its width follows its text.
+    private const int SaveButtonHeight = 34;
 
-    // The csv table, for a touch screen: its font this many points bigger than the window's (9 → 13 pt), and every row this
-    // many pixels (at 100%) higher than its text.
+    // The csv table, for a touch screen: its font this many points bigger than the window's, and every row this many
+    // pixels (at 100%) higher than its text.
     private const float CsvExtraPoints = 4;
     private const int CsvRowExtraHeight = 14;
 
-    // The save button left of them: wide enough for "Enregistrer le modèle" (a test checks all languages).
-    private static readonly Size SaveButtonSize = new(150, 28);
-
-    // The company logo at the bottom left and the user-guide icon next to the app version (at 100%).
-    private static readonly Size LogoSize = new(35, 32);
-
-    // The editor column is never narrower than its title buttons (save + "Template (xml)"), nor than the row below it (the
-    // logo and the csv and board buttons at their widest); the title itself may then shrink to "…". The preview column keeps
-    // at least MinimumColumnWidth. (Declared after LogoSize: a static field can only use the ones above it.)
-    private static readonly int MinimumEditorColumnWidth = Math.Max(
-        SaveButtonSize.Width + 4 + ViewButtonSize.Width + 4,
-        LogoSize.Width + NavigationSideRoom + 2 * NavigationButtonMaximumWidth + 4);
-    private static readonly Size UserGuideIconSize = new(16, 16);
+    // The ROGIERS logo and the user-guide "?" in the top bar (at 100%): as high as the clock sign, 18 (Daan, 2026-11-21).
+    // The "?" button itself is a little bigger than its 18 px disc, so it is still easy to hit.
+    private static readonly Size LogoSize = new(24, 18);
+    private static readonly Size UserGuideSize = new(28, 28);
 
     // The "?" icon before each path caption (at 100%), and the longest line of its hover text (in characters): a WinForms
     // tooltip does not wrap by itself, a paragraph would be one line as wide as the screen.
-    private static readonly Size HowToIconSize = new(16, 16);
+    private static readonly Size HowToIconSize = new(20, 20);
+
+    // The "v" before each file line (folds the line up), at 100%. A folded line is as high as this button, so it is not
+    // bigger than needed: each folded line gives the panels below about 20 px.
+    private static readonly Size FoldButtonSize = new(24, 24);
     internal const int HowToLineLength = 80;
 
     // The preview follows the text this long after the last key press (not after every letter).
     private const int PreviewDelayMilliseconds = 300;
 
     // The controls we need to read or fill (internal: the tests check them)
-    internal readonly PictureBox BannerPicture = new();
+    internal readonly TableLayoutPanel TopBar = new();
+    internal readonly TitleTab TitleTab = new();     // the white tab at the top left: logo, name, subtitle
     internal readonly Label LanguageCaption = new();
     internal readonly ComboBox LanguageBox = new();
     internal readonly Label CreditLabel = new();
     internal readonly Label VersionLabel = new();
-    internal readonly PictureBox UserGuidePicture = new();
-    internal readonly PictureBox XmlHowToPicture = new(); // the "?" before "Template of label-xml:": the two kinds of label files
-    internal readonly PictureBox CsvHowToPicture = new(); // the same "?" before "Label-csv:"
+    internal readonly DiscButton UserGuideButton = new(); // the round navy "?" at the top right: opens the user guide
+    internal readonly ClockDisplay Clock = new();         // the time, at the top right (like Maestro)
+    internal readonly WindowButton MinimizeButton = new() { Kind = WindowButtonKind.Minimize }; // the window has no Windows title bar:
+    internal readonly WindowButton MaximizeButton = new() { Kind = WindowButtonKind.Maximize }; // its three buttons are in the top bar
+    internal readonly WindowButton CloseButton = new() { Kind = WindowButtonKind.Close };
+    internal readonly Label FilesCaption = new();    // "Label files", the title of the white panel with the two file lines
+    internal readonly PictureBox FilesHowToPicture = new(); // the "?" after "Label files": the two kinds of label files
+    internal readonly FoldButton XmlFoldButton = new();   // the "v" before "Template of label-xml:": folds that line up
+    internal readonly FoldButton CsvFoldButton = new();   // the same before "Label-csv:"
+    internal readonly Label XmlFoldedName = new();        // a folded line shows only its caption and the file name
+    internal readonly Label CsvFoldedName = new();
     internal readonly Label XmlFileCaption = new();  // "Template of label-xml:"
     internal readonly TextBox XmlFileBox = new();    // the path of the file in the editor
     internal readonly RoundedButton XmlBrowseButton = new();
     internal readonly Label CsvFileCaption = new();  // "Label-csv:"
     internal readonly TextBox CsvFileBox = new();    // the path of the label-csv with the data for a template
     internal readonly RoundedButton CsvBrowseButton = new();
-    internal readonly Label FileStatus = new();      // what is open: label-xml / template + csv, and how many labels
-    internal readonly Label LabelSizeCaption = new(); // "Labelformaat (mm):", right of the status line
+    internal readonly Label LabelSizeCaption = new(); // "Labelformaat (mm):", in the preview's title
     internal readonly TextBox LabelLengthBox = new(); // the label length in mm (horizontal, X)
     internal readonly TextBox LabelWidthBox = new();  // the label width in mm (vertical, Y)
     internal readonly TableLayoutPanel LabelSizePanel = new(); // the caption and the two fields, right of the preview title
-    internal readonly Label EditorCaption = new();
-    internal readonly RoundedButton XmlViewButton = new(); // above the left column: shows the template text (only with a label-csv)
-    internal readonly RoundedButton CsvViewButton = new(); // below the left column, left of the board button: the csv table (an icon)
-    internal readonly TableLayoutPanel EditorHeader = new(); // the editor title with save and "Template (xml)"
-    internal readonly Panel EditorArea = new();             // holds the editor and the csv table, one of them visible
+    internal readonly TitleLabel EditorCaption = new(); // with the csv's file name in bold after "Data =" (Daan, 2026-11-21)
+    internal readonly TabButton XmlViewButton = new();  // the template text (only with a label-csv); the table and the board: round buttons below
+    internal readonly TableLayoutPanel EditorHeader = new(); // the title of the left panel with "Template (xml)", and save below it
+    internal readonly Panel EditorArea = new();             // holds the editor, the csv table and the board, one of them visible
     internal readonly DataGridView CsvGrid = new();         // the label-csv, read-only, one row per label
     internal readonly Label PreviewCaption = new();
-    internal readonly Label LabelCounter = new();    // "2 / 3", left of the arrows
-    internal readonly RoundedButton PreviousButton = new();
-    internal readonly RoundedButton NextButton = new();
-    internal readonly RoundedButton PrintButton = new(); // right of the arrows: prints the shown label (or more)
-    internal readonly RoundedButton BoardButton = new(); // left of the arrows: shows the board in the left column (a toggle)
+    internal readonly InfoTile PositionTile = new(); // below the preview: X, Y, ID and rotation of the shown label
+    internal readonly InfoTile SheetTile = new();    // below the preview: the size of its sheet
+    internal readonly TableLayoutPanel Tiles = new(); // the two tiles side by side
+    internal readonly Label LabelCounter = new();    // "2 / 3", between the arrows in the bottom bar
+    internal readonly DiscButton PreviousButton = new();
+    internal readonly DiscButton NextButton = new();
+    internal readonly PillButton PrintButton = new();  // at the bottom right: prints the shown label (or more)
+    internal readonly DiscButton CsvViewButton = new(); // in the bottom bar: the csv table (the same as the csv tab)
+    internal readonly DiscButton BoardButton = new();   // in the bottom bar: the board (a toggle, the same as the board tab)
     internal readonly SheetBoard Board;                  // the board view: the sheet with all label positions, big
+    internal readonly BottomBar BottomBar;               // the blue bar at the bottom with the round buttons and print
     internal readonly TableLayoutPanel PreviewHeader = new(); // the preview title with the label size
-    internal readonly TableLayoutPanel PreviewNavigation = new(); // below the preview: the counter, the arrows and print
     internal readonly XmlEditor Editor = new();
     internal readonly LabelPreview Preview = new();
-    internal readonly ColumnSplitter ColumnDivider = new(); // the vertical line between the editor and the preview, can be dragged
-    internal readonly TableLayoutPanel Workspace = new();   // row 2: the two columns and the line between them
-    internal readonly List<Panel> Dividers = new();  // the horizontal lines
-    internal readonly PictureBox LogoPicture = new();
-    internal readonly RoundedButton SaveButton = new(); // "Template opslaan", left of the view buttons, only after a change
+    internal readonly ColumnSplitter ColumnDivider = new(); // the grey gap between the two panels, can be dragged
+    internal readonly TableLayoutPanel Workspace = new();   // the two panels and the gap between them
+    internal readonly PictureBox LogoPicture = new();       // the ROGIERS logo in the top bar
+    internal readonly RoundedButton SaveButton = new(); // "Template opslaan", just below "Template (xml)", only after a change
 
     private readonly ToolTip _toolTip = new();
 
     // The hover text of the "?" icons is long: it stays up longer than the standard 5 seconds (32767 ms is the maximum).
     internal readonly ToolTip HowToToolTip = new() { AutoPopDelay = 32767, InitialDelay = 200 };
     private readonly System.Windows.Forms.Timer _previewTimer = new() { Interval = PreviewDelayMilliseconds };
+    private readonly System.Windows.Forms.Timer _clockTimer = new() { Interval = 5000 }; // the clock shows minutes
 
     // The open file. Null = nothing opened yet (Save then asks for a name).
     private string? _currentFile;
@@ -139,7 +156,6 @@ internal class MainForm : Form
     private bool _loading;              // filling the editor from a file: that is not a change by the user
     private LabelCsv? _csv;             // the label-csv that goes with the template in the editor; null for a label-xml
     private bool _isLabelXml;           // the editor holds a valid label-xml: then a label-csv is not used
-    private Control? _fileRow;          // the rows with the path boxes: the texts above and below get their width (FitFileTexts)
     private bool _showingCsv;           // the left column shows the csv table instead of the template text
     private bool _showingBoard;         // the left column shows the board (over the text or the table, which stays chosen)
     private bool _selectingCsvRow;      // the program (not the user) selects a row of the csv table
@@ -187,6 +203,7 @@ internal class MainForm : Form
         _fileToOpen = fileToOpen;
         _dataFolder = dataFolder;
         Board = new SheetBoard(Preview); // the board draws what the preview knows
+        BottomBar = new BottomBar(CsvViewButton, BoardButton, PreviousButton, LabelCounter, NextButton, PrintButton);
 
         // The settings were just read from settings.json: a later change of the file is noticed in OnActivated.
         string? settingsFile = SettingsFilePath;
@@ -207,6 +224,10 @@ internal class MainForm : Form
         LabelWidthBox.Text = LabelXml.Format(_settings.LabelWidth);
         Preview.LabelSize = new SizeF((float)_settings.LabelLength, (float)_settings.LabelWidth);
         ApplyHandEditedSettings(); // the settings that are only in settings.json, not in the window
+
+        // The file lines folded as the user left them (after the window was built: the heights are then in pixels).
+        FoldFileLine(xmlLine: true, _settings.XmlFileLineFolded, save: false);
+        FoldFileLine(xmlLine: false, _settings.CsvFileLineFolded, save: false);
         LabelLengthBox.TextChanged += (sender, e) => OnLabelSizeChanged(LabelLengthBox);
         LabelWidthBox.TextChanged += (sender, e) => OnLabelSizeChanged(LabelWidthBox);
 
@@ -223,71 +244,246 @@ internal class MainForm : Form
         // ResumeLayout (see the constructor).
         AutoScaleDimensions = new SizeF(96F, 96F);
         AutoScaleMode = AutoScaleMode.Dpi;
-        Font = Theme.CreateBodyFont(); // the Windows 11 font; all controls below inherit it
+        Font = Theme.CreateBodyFont(); // Verdana, like Maestro; all controls below inherit it
         Icon = AppIcons.ForWindow();
-        BackColor = Theme.White;
-        ForeColor = Theme.Navy;
+        FormBorderStyle = FormBorderStyle.None; // no Windows title bar: the top bar is the title bar (CreateParams, WndProc)
+        Padding = ResizePadding(ResizeEdge);    // the thin edge to resize with (0 while maximised: OnSizeChanged)
+        BackColor = Theme.WindowEdge;           // only that edge shows the form's own colour
+        ForeColor = Theme.Text;
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(WindowWidth, WindowHeight);
-        MinimumSize = new Size(BannerWidth + 30, 500);
+        MinimumSize = SmallestWindow;
 
-        // Top: the banner, on the brand colour (the banner picture has the same background).
-        var banner = new Panel { Dock = DockStyle.Top, Height = BannerHeight, BackColor = Theme.Brand };
-        BannerPicture.Image = AppIcons.Banner();
-        BannerPicture.SizeMode = PictureBoxSizeMode.Zoom;
-        BannerPicture.Dock = DockStyle.Left;
-        BannerPicture.Width = BannerWidth;
-        BannerPicture.BackColor = Theme.Brand;
-        banner.Controls.Add(BannerPicture);
-
-        // Below: one table with a row per part. Only the two columns (row 2) grow with the window.
+        // In between the two bars: the white panel with the files, and below it the two big panels (they get the rest of
+        // the height), on the grey frame.
         var body = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(20, 4, 20, 20), // left, top, right, bottom: the room below the buttons is as wide as at the sides
+            Padding = new Padding(PanelGap),
             ColumnCount = 1,
-            BackColor = Theme.White,
+            RowCount = 2,
+            BackColor = Theme.Frame,
         };
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-
-        int row = 0;
-
-        // The top row: the language on the left; the credit, the app version and the user-guide icon on the right.
-        var topRow = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
-        topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        topRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        topRow.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        topRow.Controls.Add(BuildLanguageColumn(), 0, 0);
-        topRow.Controls.Add(BuildCredits(), 1, 0);
-        AddRow(body, ref row, topRow);
-        AddDivider(body, ref row, new Padding(0, 12, 0, 12));
-
-        // Row 1: the label files: the path boxes and what is open now. The description of the two kinds of files is no
-        // longer a text here but the hover text of the "?" icons before the path captions (Daan, 2026-10-26: more height
-        // for row 2). The status line gets its size from the window (FitFileTexts), never from the table: see
-        // TsDssConverter's "layout rules learned the hard way".
-        _fileRow = BuildFileRows();
-        AddRow(body, ref row, _fileRow);
-
-        AddRow(body, ref row, BuildStatusRow());
-
-        _fileRow.SizeChanged += (sender, e) => FitFileTexts();
-        FileStatus.FontChanged += (sender, e) => FitFileTexts(); // the window moved to a screen with another scaling
-        // (No divider line between row 1 and row 2 any more, Daan 2026-10-26: the status line has room below it instead.)
-
-        // Row 2: the editor and the preview, and below them the logo and the big buttons (there is no footer row any
-        // more: Close is gone and Save sits above the editor, Daan 2026-10-25). Takes the rest of the height.
-        Control workspace = BuildWorkspace();
+        body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        body.Controls.Add(workspace, 0, row);
-        row++;
-        body.RowCount = row;
+        body.Controls.Add(BuildFilesPanel(), 0, 0);
+        Control workspace = BuildWorkspace();
+        workspace.Margin = new Padding(0, PanelGap, 0, 0);
+        body.Controls.Add(workspace, 0, 1);
 
-        // Docking: the control that is added LAST sits at the very top.
+        // Docking: the control that is added LAST is placed first (the bars at the top and bottom, the body in between).
         Controls.Add(body);
-        Controls.Add(banner);
+        Controls.Add(BuildBottomBar());
+        Controls.Add(BuildTopBar());
 
         SetUpTabOrder();
+    }
+
+    /// <summary>
+    /// The top bar (it replaces the blue banner and the language row of 1.x): at the left the white title tab with the logo
+    /// and the program name; at the right the language (title above the box), a short line, the credit and the version (two
+    /// small lines), the ROGIERS logo and the round user-guide button (Daan's mockup).
+    /// </summary>
+    private Control BuildTopBar()
+    {
+        TitleTab.Text = Strings.AppName;
+        TitleTab.Subtitle = Strings.BannerSubtitle;
+        TitleTab.Dock = DockStyle.Fill; // the rest of the width; the white tab is as wide as its text (or narrower)
+        TitleTab.Margin = new Padding(0);
+
+        Panel Separator() => new() { Size = new Size(1, 40), BackColor = Theme.Separator, Anchor = AnchorStyles.Left, Margin = new Padding(16, 0, 14, 0) };
+
+        TopBar.Dock = DockStyle.Top;
+        TopBar.Height = TopBarHeight;
+        TopBar.BackColor = Theme.TopBar;
+        TopBar.Padding = new Padding(0, 0, PanelGap, 0);
+        TopBar.Margin = new Padding(0);
+        TopBar.ColumnCount = 11;
+        TopBar.RowCount = 1;
+        TopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        for (int i = 1; i < TopBar.ColumnCount; i++)
+        {
+            TopBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // fixed-size controls: never in a Percent column
+        }
+
+        TopBar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        TopBar.Controls.Add(TitleTab, 0, 0);
+        TopBar.Controls.Add(BuildLanguageColumn(), 1, 0);
+        TopBar.Controls.Add(Separator(), 2, 0);
+        TopBar.Controls.Add(BuildCredits(), 3, 0);
+        TopBar.Controls.Add(BuildLogo(), 4, 0);
+        TopBar.Controls.Add(BuildUserGuideButton(), 5, 0);
+        TopBar.Controls.Add(Separator(), 6, 0);
+        TopBar.Controls.Add(BuildClock(), 7, 0);
+        TopBar.Controls.Add(MinimizeButton, 8, 0);
+        TopBar.Controls.Add(MaximizeButton, 9, 0);
+        TopBar.Controls.Add(CloseButton, 10, 0);
+
+        foreach (WindowButton button in new[] { MinimizeButton, MaximizeButton, CloseButton })
+        {
+            button.Size = WindowButtonSize;
+            button.Anchor = AnchorStyles.Left;
+            button.Margin = new Padding(6, 0, 0, 0);
+        }
+
+        MinimizeButton.Click += (sender, e) => WindowState = FormWindowState.Minimized;
+        MaximizeButton.Click += (sender, e) => ToggleMaximized();
+        CloseButton.Click += (sender, e) => Close(); // still asks about unsaved changes (OnFormClosing)
+
+        // The top bar is the title bar: dragging it moves the window, a double-click maximises it (or back). Only on the
+        // bar itself and the parts that do nothing on a click (the title tab, the credit, the clock).
+        foreach (Control handle in new Control[] { TopBar, TitleTab, CreditLabel, VersionLabel, Clock, LanguageCaption })
+        {
+            handle.MouseDown += (sender, e) => DragWindowFromTopBar(e);
+        }
+
+        return TopBar;
+    }
+
+    /// <summary>The clock: the time now, again every few seconds (it shows minutes, so it is never more than seconds late).</summary>
+    private Control BuildClock()
+    {
+        Clock.Anchor = AnchorStyles.Left;
+        Clock.Margin = new Padding(0, 0, 10, 0);
+        Clock.Size = new Size(80, 30); // the width follows the font (FitButtonWidths)
+        Clock.Time = DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+        _clockTimer.Tick += (sender, e) => Clock.Time = DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+        _clockTimer.Start();
+        return Clock;
+    }
+
+    /// <summary>The maximise button (and a double-click on the top bar): maximised ↔ the normal window. In full screen: back.</summary>
+    internal void ToggleMaximized()
+    {
+        if (_fullScreen)
+        {
+            ToggleFullScreen();
+            return;
+        }
+
+        WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized;
+    }
+
+    private bool _fullScreen;
+    private FormWindowState _stateBeforeFullScreen;
+
+    /// <summary>Internal: true while the window covers the whole monitor, taskbar included (F11).</summary>
+    internal bool IsFullScreen => _fullScreen;
+
+    /// <summary>
+    /// F11, like a browser (Daan, 2026-11-21): the window covers the WHOLE monitor, the Windows taskbar included; F11 again
+    /// (or the maximise button) goes back to how it was. It is a maximised window whose "maximised" size is the whole
+    /// monitor instead of its working area (WndProc, WM_GETMINMAXINFO). Not remembered for the next start.
+    /// </summary>
+    internal void ToggleFullScreen()
+    {
+        if (!_fullScreen)
+        {
+            _stateBeforeFullScreen = WindowState == FormWindowState.Maximized ? FormWindowState.Maximized : FormWindowState.Normal;
+            _fullScreen = true;
+            if (WindowState == FormWindowState.Maximized)
+            {
+                WindowState = FormWindowState.Normal; // maximising again asks Windows for the (new) maximised size
+            }
+
+            WindowState = FormWindowState.Maximized;
+        }
+        else
+        {
+            _fullScreen = false;
+            WindowState = FormWindowState.Normal;
+            WindowState = _stateBeforeFullScreen;
+        }
+    }
+
+    /// <summary>
+    /// The mouse went down on the top bar: Windows moves the window from here, as if the title bar had been grabbed (also
+    /// snapping to a screen edge, and moving to another monitor). A double-click maximises it, or back.
+    /// </summary>
+    private void DragWindowFromTopBar(MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left)
+        {
+            return;
+        }
+
+        if (e.Clicks == 2)
+        {
+            ToggleMaximized();
+            return;
+        }
+
+        NativeWindowMethods.ReleaseCapture();
+        NativeWindowMethods.SendMessage(Handle, NativeWindowMethods.WM_NCLBUTTONDOWN, NativeWindowMethods.HTCAPTION, IntPtr.Zero);
+    }
+
+    /// <summary>
+    /// Without a Windows frame a window cannot be minimised from the taskbar and does not get the minimise / maximise
+    /// animation: these two styles give them back (they draw nothing).
+    /// </summary>
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams parameters = base.CreateParams;
+            parameters.Style |= NativeWindowMethods.WS_MINIMIZEBOX | NativeWindowMethods.WS_MAXIMIZEBOX | NativeWindowMethods.WS_SYSMENU;
+            return parameters;
+        }
+    }
+
+    /// <summary>
+    /// Two Windows messages for a window without a frame: where the mouse may resize it (the thin edge, the corners a
+    /// little bigger), and how big "maximised" is (the working area of ITS monitor, so the taskbar stays visible).
+    /// </summary>
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == NativeWindowMethods.WM_GETMINMAXINFO)
+        {
+            NativeWindowMethods.LimitMaximizedToWorkingArea(Handle, m.LParam, wholeMonitor: _fullScreen);
+        }
+
+        base.WndProc(ref m);
+
+        if (m.Msg == NativeWindowMethods.WM_NCHITTEST && WindowState == FormWindowState.Normal && (int)m.Result == NativeWindowMethods.HTCLIENT)
+        {
+            Point point = PointToClient(new Point(unchecked((short)(long)m.LParam), unchecked((short)((long)m.LParam >> 16))));
+            int edge = LogicalToDeviceUnits(ResizeEdge), corner = LogicalToDeviceUnits(ResizeEdge * 4);
+            bool left = point.X < edge, right = point.X >= ClientSize.Width - edge;
+            bool top = point.Y < edge, bottom = point.Y >= ClientSize.Height - edge;
+            bool nearLeft = point.X < corner, nearRight = point.X >= ClientSize.Width - corner;
+            bool nearTop = point.Y < corner, nearBottom = point.Y >= ClientSize.Height - corner;
+            int hit = (top && nearLeft) || (left && nearTop) ? NativeWindowMethods.HTTOPLEFT
+                : (top && nearRight) || (right && nearTop) ? NativeWindowMethods.HTTOPRIGHT
+                : (bottom && nearLeft) || (left && nearBottom) ? NativeWindowMethods.HTBOTTOMLEFT
+                : (bottom && nearRight) || (right && nearBottom) ? NativeWindowMethods.HTBOTTOMRIGHT
+                : left ? NativeWindowMethods.HTLEFT
+                : right ? NativeWindowMethods.HTRIGHT
+                : top ? NativeWindowMethods.HTTOP
+                : bottom ? NativeWindowMethods.HTBOTTOM
+                : NativeWindowMethods.HTCLIENT;
+            m.Result = (IntPtr)hit;
+        }
+    }
+
+    /// <summary>
+    /// The resize edge at the left, right and bottom; NOT at the top, so the white title tab sticks to the top of the window
+    /// (Daan, 2026-11-21). The top corners still resize (the side edges reach up to them).
+    /// </summary>
+    private static Padding ResizePadding(int edge) => new(edge, 0, edge, edge);
+
+    /// <summary>Maximised: no resize edge (it would show as a grey line around the screen), and the restore sign.</summary>
+    protected override void OnSizeChanged(EventArgs e)
+    {
+        base.OnSizeChanged(e);
+        bool maximised = WindowState == FormWindowState.Maximized;
+        Padding edge = maximised ? Padding.Empty : ResizePadding(LogicalToDeviceUnits(ResizeEdge));
+        if (Padding != edge && WindowState != FormWindowState.Minimized)
+        {
+            Padding = edge;
+        }
+
+        MaximizeButton.Maximised = maximised;
     }
 
     /// <summary>
@@ -355,25 +551,28 @@ internal class MainForm : Form
         box.Leave += (sender, e) => selectOnMouseUp = false;
     }
 
-    /// <summary>The left part of the top row: the language title (in all three languages) and the language box.</summary>
+    /// <summary>In the top bar: the language title (in all three languages) above the language box.</summary>
     private Control BuildLanguageColumn()
     {
         LanguageCaption.Text = Strings.LanguageTitle;
         LanguageCaption.AutoSize = true;
-        LanguageCaption.Font = new Font(Font, FontStyle.Bold);
-        LanguageCaption.Margin = new Padding(0, 6, 0, 2);
+        LanguageCaption.ForeColor = Theme.Text;
+        LanguageCaption.Margin = new Padding(0, 0, 0, 3);
 
         LanguageBox.DropDownStyle = ComboBoxStyle.DropDownList; // choose from the list, no typing
+        LanguageBox.FlatStyle = FlatStyle.Flat;                 // a flat grey field, like the path boxes
+        LanguageBox.BackColor = Theme.Field;
         LanguageBox.Items.Add(new LanguageItem(AppLanguage.Dutch, Strings.LanguageDutch));
         LanguageBox.Items.Add(new LanguageItem(AppLanguage.French, Strings.LanguageFrench));
         LanguageBox.Items.Add(new LanguageItem(AppLanguage.English, Strings.LanguageEnglish));
-        LanguageBox.Width = 260;
+        LanguageBox.Width = 200;
         LanguageBox.Anchor = AnchorStyles.Left;
-        LanguageBox.ForeColor = Theme.Navy;
-        LanguageBox.Margin = new Padding(0, 0, 0, 8);
+        LanguageBox.ForeColor = Theme.Text;
+        LanguageBox.Margin = new Padding(0);
 
-        // One AutoSize column (a Percent column in an AutoSize table would shrink the drop-down).
-        var column = new TableLayoutPanel { ColumnCount = 1, RowCount = 2, AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top, Margin = new Padding(0) };
+        // One AutoSize column (a Percent column in an AutoSize table would shrink the drop-down); in the middle of the
+        // bar's height (anchored left only).
+        var column = new TableLayoutPanel { ColumnCount = 1, RowCount = 2, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(16, 0, 0, 0) };
         column.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         column.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         column.Controls.Add(LanguageCaption, 0, 0);
@@ -381,74 +580,83 @@ internal class MainForm : Form
         return column;
     }
 
-    /// <summary>The right part of the top row, against the right edge: "Dev.: Daan Verhoost | App version: 0.1.0" and the user-guide icon.</summary>
+    /// <summary>In the top bar: "Dev.: Daan Verhoost" above "App version: 2.0.0", small, against the right (Daan's mockup).</summary>
     private Control BuildCredits()
     {
-        CreditLabel.Text = Strings.DeveloperCredit;
-        CreditLabel.AutoSize = true;
-        CreditLabel.Margin = new Padding(0);
-        CreditLabel.ForeColor = Theme.Navy;
-
-        var separator = new Label { Text = Strings.CreditSeparator, AutoSize = true, Margin = new Padding(0), ForeColor = Theme.PaleBlue };
-
-        VersionLabel.AutoSize = true;
-        VersionLabel.Margin = new Padding(0);
-        VersionLabel.ForeColor = Theme.Navy;
-
-        var line = new FlowLayoutPanel
+        var small = Theme.CreateFont(Font, Font.SizeInPoints - 1.5f);
+        foreach (Label label in new[] { CreditLabel, VersionLabel })
         {
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
-            AutoSize = true,
-            Anchor = AnchorStyles.Right | AnchorStyles.Top,
-            Margin = new Padding(0, 6, 0, 8), // the same top margin as the language title, so both sit on one line
-        };
+            label.AutoSize = true;
+            label.Font = small;
+            label.ForeColor = Theme.Text;
+            label.Anchor = AnchorStyles.Right;
+            label.Margin = new Padding(0, 1, 0, 1);
+        }
 
-        // Not higher than the text line; the top margin puts its middle on the middle of the letters.
-        UserGuidePicture.Image = AppIcons.UserGuide();
-        UserGuidePicture.SizeMode = PictureBoxSizeMode.Zoom;
-        UserGuidePicture.Size = UserGuideIconSize;
-        UserGuidePicture.BackColor = Theme.White;
-        UserGuidePicture.Margin = new Padding(10, 1, 0, 0);
-        UserGuidePicture.Cursor = Cursors.Hand;
-        UserGuidePicture.Click += (sender, e) => OpenWebsite(Strings.UserGuideUrl);
+        CreditLabel.Text = Strings.DeveloperCredit;
 
-        line.Controls.Add(CreditLabel);
-        line.Controls.Add(separator);
-        line.Controls.Add(VersionLabel);
-        line.Controls.Add(UserGuidePicture);
-        return line;
+        var column = new TableLayoutPanel { ColumnCount = 1, RowCount = 2, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0) };
+        column.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        column.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        column.Controls.Add(CreditLabel, 0, 0);
+        column.Controls.Add(VersionLabel, 0, 1);
+        return column;
+    }
+
+    /// <summary>The round navy "?" at the top right: opens the user guide (the GitHub page of this tool).</summary>
+    private Control BuildUserGuideButton()
+    {
+        // Flat and grey like the clock sign (Daan, 2026-11-21).
+        UserGuideButton.Flat = true;
+        UserGuideButton.Glyph = DiscGlyph.Question;
+        UserGuideButton.Size = UserGuideSize;
+        UserGuideButton.Anchor = AnchorStyles.Left;
+        UserGuideButton.Margin = new Padding(8, 0, 0, 0);
+        UserGuideButton.Click += (sender, e) => OpenWebsite(Strings.UserGuideUrl);
+        return UserGuideButton;
     }
 
     /// <summary>
-    /// Gives the status line below the path boxes its size: as wide as that row, one line high (cut off with "…").
+    /// The white panel with the two label files: its title, the two file lines (<see cref="BuildFileRows"/>) and the status
+    /// line. AutoSize: as high as its content.
     /// </summary>
-    private void FitFileTexts()
+    private Control BuildFilesPanel()
     {
-        if (_fileRow == null || _fileRow.Width <= 0)
+        FilesCaption.AutoSize = true;
+        FilesCaption.Font = Theme.CreateFont(Font, Font.SizeInPoints + 2);
+        FilesCaption.ForeColor = Theme.Text;
+        FilesCaption.Anchor = AnchorStyles.Left;
+        FilesCaption.Margin = new Padding(0, 0, 8, 0);
+
+        // The title and, right after it, the one "?" with the description of the two kinds of label files.
+        SetUpHowToPicture(FilesHowToPicture);
+        FilesHowToPicture.Anchor = AnchorStyles.Left;
+        FilesHowToPicture.Margin = new Padding(0);
+        var title = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top, Margin = new Padding(0, 0, 0, 8) };
+        title.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        title.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        title.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        title.Controls.Add(FilesCaption, 0, 0);
+        title.Controls.Add(FilesHowToPicture, 1, 0);
+
+        // No status line below the files any more (Daan, 2026-11-21): the number of labels is in the left panel's title,
+        // what to do when nothing (or broken xml) is open is written in the preview.
+        var panel = new TableLayoutPanel
         {
-            return; // still building the window: fitted when the row gets its width
-        }
-
-        int width = _fileRow.Width;
-
-        // The status line has the whole width (the label size moved to the preview title, Daan 2026-10-25).
-        var status = new Size(Math.Max(0, width - FileStatus.Margin.Horizontal), FileStatus.PreferredHeight);
-        if (FileStatus.Size != status)
-        {
-            FileStatus.Size = status;
-        }
-    }
-
-    /// <summary>Below the path boxes: the status line (what is open, how many labels), over the whole width.</summary>
-    private Control BuildStatusRow()
-    {
-        FileStatus.AutoSize = false;     // its size comes from FitFileTexts
-        FileStatus.AutoEllipsis = true;  // a long csv path ends in "…" instead of a second line
-        FileStatus.Anchor = AnchorStyles.Left;
-        FileStatus.Margin = new Padding(0, 6, 0, 12); // the room below it replaces the divider line above row 2
-        FileStatus.ForeColor = Theme.Navy;
-        return FileStatus;
+            ColumnCount = 1,
+            RowCount = 2,
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            BackColor = Theme.White,
+            Padding = new Padding(PanelPadding, 12, PanelPadding, 12),
+            Margin = new Padding(0),
+        };
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        panel.Controls.Add(title, 0, 0);
+        panel.Controls.Add(BuildFileRows(), 0, 1);
+        return panel;
     }
 
     /// <summary>
@@ -460,16 +668,16 @@ internal class MainForm : Form
         LabelSizeCaption.AutoSize = true;
         LabelSizeCaption.Anchor = AnchorStyles.Left;
         LabelSizeCaption.Margin = new Padding(0, 0, 6, 0);
-        LabelSizeCaption.ForeColor = Theme.Navy;
+        LabelSizeCaption.ForeColor = Theme.Text;
 
-        var times = new Label { Text = Strings.LabelSizeTimes, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(4, 0, 4, 0), ForeColor = Theme.Navy };
+        var times = new Label { Text = Strings.LabelSizeTimes, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(4, 0, 4, 0), ForeColor = Theme.Text };
 
         // The size panel: AutoSize columns only (the frames have a fixed size).
         LabelSizePanel.ColumnCount = 4;
         LabelSizePanel.RowCount = 1;
         LabelSizePanel.AutoSize = true;
         LabelSizePanel.Anchor = AnchorStyles.Right;
-        LabelSizePanel.Margin = new Padding(0);
+        LabelSizePanel.Margin = new Padding(0, 0, 12, 0);
         for (int i = 0; i < 4; i++)
         {
             LabelSizePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -483,12 +691,21 @@ internal class MainForm : Form
         return LabelSizePanel;
     }
 
-    /// <summary>One field of the label size, in the same rounded frame as the path box, the number on the right.</summary>
+    /// <summary>One field of the label size: a flat grey field like the path boxes, the number on the right.</summary>
     private static TextBoxFrame LabelSizeFrame(TextBox box)
     {
-        box.ForeColor = Theme.Navy;
+        box.ForeColor = Theme.Text;
         box.TextAlign = HorizontalAlignment.Right;
-        return new TextBoxFrame(box) { Size = LabelSizeBoxSize, Margin = new Padding(0) };
+        return GreyField(box, LabelSizeBoxSize);
+    }
+
+    /// <summary>A text box in the flat grey field of the Maestro skin (the path boxes, the label size).</summary>
+    private static TextBoxFrame GreyField(TextBox box, Size size)
+    {
+        var frame = new TextBoxFrame(box) { Size = size, Margin = new Padding(0) };
+        Theme.StyleField(frame, Theme.Field);
+        box.BackColor = Theme.Field;
+        return frame;
     }
 
     /// <summary>
@@ -498,7 +715,7 @@ internal class MainForm : Form
     private void OnLabelSizeChanged(TextBox box)
     {
         bool valid = LabelXml.TryNumber(box.Text, out double millimetres) && AppSettings.IsValidLabelSize(millimetres);
-        box.ForeColor = valid ? Theme.Navy : Theme.Error;
+        box.ForeColor = valid ? Theme.Text : Theme.Error;
         if (!valid)
         {
             return;
@@ -518,15 +735,17 @@ internal class MainForm : Form
     }
 
     /// <summary>
-    /// Row 1: two lines, each a "?" icon (hover: what the two kinds of label files are), a caption, a path box (Enter
-    /// opens what was typed) and a Browse button:
+    /// The two file lines, each a "v" (folds the line up, Daan 2026-11-21), a caption, a path box (Enter opens what was
+    /// typed) and a Browse button:
     ///   "Template of label-xml:"  the file in the editor;
     ///   "Label-csv:"              the data for a template (not used, and greyed out, with a label-xml).
+    /// A folded line keeps its "v" and caption and shows the path as one line of text instead of the box and Browse, so the
+    /// panels below get that height.
     /// </summary>
     private Control BuildFileRows()
     {
-        // Icons, captions, frames and buttons in AutoSize columns, only the frames stretch (anchored left and right in the
-        // Percent column), so the captions never wrap and the icons and buttons are never shrunk.
+        // Fold buttons, captions, path holders and Browse in AutoSize columns, only the path holders stretch (anchored left
+        // and right in the Percent column), so the captions never wrap and the buttons are never shrunk.
         var rows = new TableLayoutPanel { ColumnCount = 4, RowCount = 2, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
         rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -535,20 +754,56 @@ internal class MainForm : Form
         rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        SetUpHowToPicture(XmlHowToPicture);
-        SetUpHowToPicture(CsvHowToPicture);
-        AddFileLine(rows, 0, XmlHowToPicture, XmlFileCaption, XmlFileBox, XmlBrowseButton, OpenTypedXmlFile, BrowseForXmlFile);
-        AddFileLine(rows, 1, CsvHowToPicture, CsvFileCaption, CsvFileBox, CsvBrowseButton, OpenTypedCsvFile, BrowseForCsvFile);
+        AddFileLine(rows, 0, XmlFoldButton, XmlFileCaption, XmlFileBox, XmlFoldedName, XmlBrowseButton, OpenTypedXmlFile, BrowseForXmlFile);
+        AddFileLine(rows, 1, CsvFoldButton, CsvFileCaption, CsvFileBox, CsvFoldedName, CsvBrowseButton, OpenTypedCsvFile, BrowseForCsvFile);
+        XmlFoldButton.Click += (sender, e) => FoldFileLine(xmlLine: true, !XmlFoldButton.Folded, save: true);
+        CsvFoldButton.Click += (sender, e) => FoldFileLine(xmlLine: false, !CsvFoldButton.Folded, save: true);
         return rows;
     }
 
     /// <summary>
-    /// The "?" icon before a path caption. Its text (the two kinds of label files) appears when the mouse rests on it,
-    /// and also when it is tapped or clicked: a touch screen has no mouse to rest.
+    /// Folds a file line up (only the "v", the caption and the path as text) or opens it again (the path box and Browse),
+    /// and remembers it in the settings when the user did it (<paramref name="save"/>).
+    /// </summary>
+    internal void FoldFileLine(bool xmlLine, bool folded, bool save)
+    {
+        FoldButton fold = xmlLine ? XmlFoldButton : CsvFoldButton;
+        TextBox box = xmlLine ? XmlFileBox : CsvFileBox;
+        Label name = xmlLine ? XmlFoldedName : CsvFoldedName;
+        RoundedButton browse = xmlLine ? XmlBrowseButton : CsvBrowseButton;
+        Control holder = name.Parent!;
+
+        fold.Folded = folded;
+        box.Parent!.Visible = !folded;
+        name.Visible = folded;
+        browse.Visible = !folded;
+        holder.Height = folded ? name.Font.Height + LogicalToDeviceUnits(6) : browse.Height;
+        _toolTip.SetToolTip(fold, folded ? Strings.UnfoldFileLine : Strings.FoldFileLine);
+        fold.AccessibleName = folded ? Strings.UnfoldFileLine : Strings.FoldFileLine;
+
+        if (save)
+        {
+            if (xmlLine)
+            {
+                _settings.XmlFileLineFolded = folded;
+            }
+            else
+            {
+                _settings.CsvFileLineFolded = folded;
+            }
+
+            TrySaveSettings();
+        }
+    }
+
+    /// <summary>
+    /// The "?" icon after "Label files" (Daan, 2026-11-21: one icon instead of one before each line). Its text (the two
+    /// kinds of label files) appears when the mouse rests on it, and also when it is tapped or clicked: a touch screen has
+    /// no mouse to rest.
     /// </summary>
     private void SetUpHowToPicture(PictureBox picture)
     {
-        picture.Image = AppIcons.HowTo();
+        picture.Image = AppIcons.HowTo(); // a navy circle with a white "?", like the Maestro buttons
         picture.SizeMode = PictureBoxSizeMode.Zoom;
         picture.Size = HowToIconSize;
         picture.BackColor = Theme.White;
@@ -589,27 +844,41 @@ internal class MainForm : Form
     }
 
     /// <summary>One line of <see cref="BuildFileRows"/>; the second line has some room above it.</summary>
-    private static void AddFileLine(TableLayoutPanel rows, int row, PictureBox howTo, Label caption, TextBox box, RoundedButton browse, Action openTyped, Action openBrowsed)
+    private static void AddFileLine(TableLayoutPanel rows, int row, FoldButton fold, Label caption, TextBox box, Label foldedName, RoundedButton browse, Action openTyped, Action openBrowsed)
     {
-        int top = row == 0 ? 0 : 6;
+        int top = row == 0 ? 0 : 8;
 
-        howTo.Anchor = AnchorStyles.Left; // in the middle of the line's height, like the caption
-        howTo.Margin = new Padding(0, top, 6, 0);
+        fold.Size = FoldButtonSize;
+        fold.Anchor = AnchorStyles.Left; // in the middle of the line's height, like the caption
+        fold.Margin = new Padding(0, top, 6, 0);
 
         caption.AutoSize = true;
         caption.Anchor = AnchorStyles.Left; // in the middle of the line's height
-        caption.Margin = new Padding(0, top, 8, 0);
-        caption.ForeColor = Theme.Navy;
+        caption.Margin = new Padding(0, top, 12, 0);
+        caption.ForeColor = Theme.Text;
 
-        // The text box sits in a rounded frame that is as high as the Browse button, so both line up (the text in the
-        // middle of the frame's height).
-        box.ForeColor = Theme.Navy;
-        var frame = new TextBoxFrame(box)
+        // The text box sits in a flat grey field that is as high as the Browse button, so both line up (the text in the
+        // middle of the field's height). The field and the text of a folded line share a holder: one of them is visible,
+        // and the holder is as high as that one (a fixed height, set by FoldFileLine; not stretched by the table).
+        box.ForeColor = Theme.Text;
+        TextBoxFrame frame = GreyField(box, new Size(FileButtonSize.Width, FileButtonSize.Height));
+        frame.Dock = DockStyle.Fill;
+        foldedName.Dock = DockStyle.Fill;
+        foldedName.AutoSize = false;
+        foldedName.AutoEllipsis = true; // one line, "…" at the end
+        foldedName.TextAlign = ContentAlignment.MiddleLeft;
+        foldedName.ForeColor = Theme.TextSoft;
+        foldedName.Visible = false;
+        box.TextChanged += (sender, e) => foldedName.Text = box.Text; // the folded line shows the same path
+        var holder = new Panel
         {
             Height = FileButtonSize.Height,
             Anchor = AnchorStyles.Left | AnchorStyles.Right,
-            Margin = new Padding(0, top, 8, 0),
+            Margin = new Padding(0, top, 10, 0),
+            BackColor = Theme.White,
         };
+        holder.Controls.Add(frame);
+        holder.Controls.Add(foldedName);
         box.KeyDown += (sender, e) =>
         {
             if (e.KeyCode == Keys.Enter)
@@ -619,50 +888,56 @@ internal class MainForm : Form
             }
         };
 
+        // A navy button with a white folder before its text (Daan's mockup).
         browse.Size = FileButtonSize;
         browse.Margin = new Padding(0, top, 0, 0);
-        Theme.StyleSecondaryButton(browse);
+        browse.Image = AppIcons.Folder();
+        browse.IconHeight = 16;
+        Theme.StyleNavyButton(browse);
         browse.Click += (sender, e) => openBrowsed();
 
-        rows.Controls.Add(howTo, 0, row);
+        rows.Controls.Add(fold, 0, row);
         rows.Controls.Add(caption, 1, row);
-        rows.Controls.Add(frame, 2, row);
+        rows.Controls.Add(holder, 2, row);
         rows.Controls.Add(browse, 3, row);
     }
 
     /// <summary>
-    /// Row 2: two columns with a thin vertical line between them. Left the text of the template, right the preview of the
-    /// label; above each a bold title. The line can be dragged to make one column wider (the share is remembered in
-    /// settings.json); a double-click gives two equal halves again. This table is not AutoSize (it fills the rest of the
-    /// window), so its controls may stretch.
+    /// The two big panels with a grey gap between them. Left a white panel with the template text, the csv table or the
+    /// board (tabs in its title); right a white panel with the preview on its grey work area, and below it the two tiles.
+    /// The gap can be dragged to make one panel wider (the share is remembered in settings.json); a double-click gives two
+    /// equal halves again. This table is not AutoSize (it fills the rest of the window), so its controls may stretch.
     /// </summary>
     private Control BuildWorkspace()
     {
-        PreviewCaption.Font = new Font(Font, FontStyle.Bold);
-        MakeOneLineTitle(PreviewCaption);
-
-        // The left column: the xml editor (XmlEditor.cs) and, for a label-csv, the csv table; one of the two is visible.
+        // The left panel: the xml editor (XmlEditor.cs), for a label-csv the csv table, and the board; one is visible.
+        // A thin grey line between the title and them (the area's top padding on the line colour).
         Editor.TextChanged += (sender, e) => OnEditorChanged();
         BuildCsvGrid();
         EditorArea.Dock = DockStyle.Fill;
         EditorArea.Margin = new Padding(0);
-        EditorArea.Controls.Add(new ContentFrame(CsvGrid) { Dock = DockStyle.Fill, Visible = false });
-        EditorArea.Controls.Add(new ContentFrame(Editor) { Dock = DockStyle.Fill, FillColor = Theme.XmlBackground }); // no white ring around the grey editor
+        EditorArea.Padding = new Padding(0, 1, 0, 0);
+        EditorArea.BackColor = Theme.GridLine;
+        var gridFrame = new ContentFrame(CsvGrid) { Dock = DockStyle.Fill, Visible = false, Inset = 0 };
+        Theme.StyleField(gridFrame, Theme.White);
+        var editorFrame = new ContentFrame(Editor) { Dock = DockStyle.Fill, Inset = 4 };
+        Theme.StyleField(editorFrame, Theme.XmlBackground); // the grey of the editor all the way to the edge
+        EditorArea.Controls.Add(gridFrame);
+        EditorArea.Controls.Add(editorFrame);
 
-        // The board: its own frame, like the preview (no ContentFrame around it).
+        // The board: on its own grey work area, like the preview (no frame around it).
         Board.Dock = DockStyle.Fill;
         Board.Margin = new Padding(0);
-        Board.BackColor = Theme.White;
         Board.Visible = false;
         Board.LabelChosen += ShowLabel; // a tapped label is shown in the preview
         EditorArea.Controls.Add(Board);
 
-        Preview.Dock = DockStyle.Fill;
-        Preview.Margin = new Padding(0);
-        Preview.BackColor = Theme.White;
+        var leftPanel = WhitePanel();
+        leftPanel.Controls.Add(BuildEditorHeader(), 0, 0);
+        leftPanel.Controls.Add(EditorArea, 0, 1);
 
-        // The handle is as wide as the room around the line (it used to be a 1 px line with 20 px margins), so it is easy
-        // to grab. Its column is AutoSize: a fixed-size control in a Percent column would be shrunk.
+        // The handle is the grey gap between the two panels. Its column is AutoSize: a fixed-size control in a Percent
+        // column would be shrunk.
         ColumnDivider.Width = ColumnSplitter.HandleWidth;
         ColumnDivider.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom;
         ColumnDivider.Margin = new Padding(0);
@@ -675,26 +950,99 @@ internal class MainForm : Form
         };
 
         Workspace.ColumnCount = 3;
-        Workspace.RowCount = 3;
+        Workspace.RowCount = 1;
         Workspace.Dock = DockStyle.Fill;
         Workspace.Margin = new Padding(0);
+        Workspace.BackColor = Theme.Frame;
         float editorPercent = (float)(_settings.EditorColumnShare * 100); // the share of the last time (0.5 = equal halves)
         Workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, editorPercent));
         Workspace.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         Workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100 - editorPercent));
-        // Three rows: the titles; the editor and the preview (their bottoms in line); the last row of the window, with
-        // the logo at the left and, below the preview, the counter, arrows and print button (where Save / Close were).
-        Workspace.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         Workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        Workspace.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        Workspace.Controls.Add(BuildEditorHeader(), 0, 0);
-        Workspace.Controls.Add(BuildPreviewHeader(), 2, 0);
-        Workspace.Controls.Add(EditorArea, 0, 1);
-        Workspace.Controls.Add(ColumnDivider, 1, 1);
-        Workspace.Controls.Add(Preview, 2, 1);
-        Workspace.Controls.Add(BuildPreviewNavigation(), 2, 2); // first: the left row takes its height from it
-        Workspace.Controls.Add(BuildLeftBottomRow(), 0, 2);
+        Workspace.Controls.Add(leftPanel, 0, 0);
+        Workspace.Controls.Add(ColumnDivider, 1, 0);
+        Workspace.Controls.Add(BuildPreviewColumn(), 2, 0);
         return Workspace;
+    }
+
+    /// <summary>A white panel: its title row (AutoSize) above its content (the rest of the height).</summary>
+    private static TableLayoutPanel WhitePanel()
+    {
+        var panel = new TableLayoutPanel
+        {
+            ColumnCount = 1,
+            RowCount = 2,
+            Dock = DockStyle.Fill,
+            BackColor = Theme.White,
+            Margin = new Padding(0),
+            Padding = new Padding(0),
+        };
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        return panel;
+    }
+
+    /// <summary>
+    /// The right column: the white panel with the preview (its title with the label size, the label on the grey work area)
+    /// and below it the two tiles (Daan's mockup): where the shown label sits, and the size of its sheet.
+    /// </summary>
+    private Control BuildPreviewColumn()
+    {
+        Preview.Dock = DockStyle.Fill;
+        Preview.Margin = new Padding(0);
+
+        var previewPanel = WhitePanel();
+        previewPanel.Controls.Add(BuildPreviewHeader(), 0, 0);
+        previewPanel.Controls.Add(Preview, 0, 1);
+
+        // The tiles: a table that is NOT AutoSize (two fixed-height tiles in its Percent columns), as high as a tile
+        // (FitTiles), anchored left and right in an AutoSize row of the column.
+        foreach (InfoTile tile in new[] { PositionTile, SheetTile })
+        {
+            tile.Dock = DockStyle.Fill;
+            tile.FontChanged += (sender, e) => FitTiles();
+        }
+
+        PositionTile.Margin = new Padding(0, 0, PanelGap / 2, 0);
+        SheetTile.Margin = new Padding(PanelGap / 2, 0, 0, 0);
+        Tiles.ColumnCount = 2;
+        Tiles.RowCount = 1;
+        Tiles.AutoSize = false;
+        Tiles.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
+        Tiles.Margin = new Padding(0, PanelGap, 0, 0);
+        Tiles.BackColor = Theme.Frame;
+        Tiles.Height = 100; // until FitTiles knows the fonts
+        Tiles.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        Tiles.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        Tiles.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        Tiles.Controls.Add(PositionTile, 0, 0);
+        Tiles.Controls.Add(SheetTile, 1, 0);
+
+        var column = new TableLayoutPanel
+        {
+            ColumnCount = 1,
+            RowCount = 2,
+            Dock = DockStyle.Fill,
+            BackColor = Theme.Frame,
+            Margin = new Padding(0),
+        };
+        column.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        column.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        column.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        column.Controls.Add(previewPanel, 0, 0);
+        column.Controls.Add(Tiles, 0, 1);
+        return column;
+    }
+
+    /// <summary>The tiles get the height their fonts need (again after a move to a screen with another scaling).</summary>
+    private void FitTiles()
+    {
+        int height = Math.Max(PositionTile.HeightNeeded(), SheetTile.HeightNeeded());
+        if (Tiles.Height != height)
+        {
+            Tiles.Height = height;
+        }
     }
 
     /// <summary>
@@ -720,7 +1068,7 @@ internal class MainForm : Form
 
     /// <summary>
     /// Gives the left column this part of the width (0.5 = equal halves) and the preview the rest, and returns the share
-    /// really used. The editor keeps at least <see cref="MinimumEditorColumnWidth"/>, the preview
+    /// really used. The editor keeps at least <see cref="EditorColumnMinimum"/>, the preview
     /// <see cref="MinimumColumnWidth"/>; when the window is too narrow for both, they share the room in that proportion.
     /// It does NOT change the settings: in a window that is (for a moment) too small for the share the user chose, that
     /// share must stay remembered (until 1.1.0 it was overwritten by the squeezed one at the next start, Daan 2026-10-25).
@@ -730,7 +1078,7 @@ internal class MainForm : Form
         int available = ColumnsWidth();
         if (available > 0)
         {
-            double editorMinimum = LogicalToDeviceUnits(MinimumEditorColumnWidth);
+            double editorMinimum = EditorColumnMinimum();
             double previewMinimum = LogicalToDeviceUnits(MinimumColumnWidth);
             double lowest = editorMinimum / available;
             double highest = 1 - previewMinimum / available;
@@ -746,48 +1094,96 @@ internal class MainForm : Form
         return share;
     }
 
-    /// <summary>The width of the two columns together (the workspace without the vertical line).</summary>
+    /// <summary>The width of the two columns together (the workspace without the gap between them).</summary>
     private int ColumnsWidth() => Workspace.ClientSize.Width - Workspace.Padding.Horizontal - ColumnDivider.Width;
 
     /// <summary>
-    /// The title of the left column and, against its right edge, the blue "Template opslaan" (only when the text was
-    /// changed, Daan 2026-10-25) and "Template (xml)", which shows the template text (only visible when a label-csv is
-    /// open). The csv table and the board are chosen with the two icon buttons below the column (Daan, 2026-11-08:
-    /// the "Label-csv" button moved there). Like the preview header, always as high as a button, so nothing jumps when
-    /// the buttons appear.
+    /// The left panel is never narrower than its "Template (xml)" tab (or the save button below it, if wider) with a little
+    /// room for its title, which may then shrink to "…". In pixels; the widths follow their texts (FitButtonWidths).
+    /// </summary>
+    private int EditorColumnMinimum() =>
+        Math.Max(XmlViewButton.Width, SaveButton.Width) + LogicalToDeviceUnits(2 * PanelPadding + 120);
+
+    /// <summary>
+    /// The title of the left panel and, against its right edge, the tab "Template (xml)" (the template text; only with a
+    /// label-csv). The csv table and the board are chosen with the round buttons of the bottom bar (Daan, 2026-11-21: the
+    /// "Table" and "Board" tabs of the mockup were removed, "since the buttons on the bar below work"). Just below
+    /// "Template (xml)" the navy "Save template", only while the text has unsaved changes (Daan, 2026-11-21: "just below
+    /// 'modele (xml)' a button should appear to save it if the user edits the XML"); the row below the tab is then a little
+    /// higher, the right panel does not move.
     /// </summary>
     private Control BuildEditorHeader()
     {
-        EditorCaption.Font = new Font(Font, FontStyle.Bold);
+        EditorCaption.Font = Theme.CreateFont(Font, Font.SizeInPoints + 2);
+        EditorCaption.ForeColor = Theme.Text;
         MakeOneLineTitle(EditorCaption);
+        EditorCaption.Margin = new Padding(PanelPadding, 0, 8, 0);
 
-        SaveButton.Size = SaveButtonSize;
-        SaveButton.Margin = new Padding(0, 0, 4, 0);
-        SaveButton.Visible = false; // nothing changed yet
-        Theme.StylePrimaryButton(SaveButton);
-        SaveButton.Click += (sender, e) => SaveFile();
-        // No AcceptButton: Enter in the path box opens the file, Enter in the editor starts a new line.
-
-        XmlViewButton.Size = ViewButtonSize;
+        XmlViewButton.IdleFill = Theme.XmlTabIdle;
+        XmlViewButton.Height = HeaderHeight;
+        XmlViewButton.Anchor = AnchorStyles.Right | AnchorStyles.Top;
         XmlViewButton.Margin = new Padding(0);
+        XmlViewButton.FontChanged += (sender, e) => FitButtonWidthsLater();
         // Also closes the board: the user chose what the left column must show.
         XmlViewButton.Click += (sender, e) => { _showingBoard = false; ShowCsvView(false); };
 
-        EditorHeader.ColumnCount = 3;
-        EditorHeader.RowCount = 1;
+        // Below "Template (xml)", against the right edge like the tab; it may be wider than the tab.
+        SaveButton.Height = SaveButtonHeight;
+        SaveButton.Anchor = AnchorStyles.Right | AnchorStyles.Top;
+        SaveButton.Margin = new Padding(0, 8, 0, 8);
+        SaveButton.Visible = false; // nothing changed yet
+        Theme.StyleNavyButton(SaveButton);
+        SaveButton.Click += (sender, e) => SaveFile();
+        // No AcceptButton: Enter in the path box opens the file, Enter in the editor starts a new line.
+
+        EditorHeader.ColumnCount = 2;
+        EditorHeader.RowCount = 2;
         EditorHeader.AutoSize = true;
         EditorHeader.Dock = DockStyle.Fill;
-        EditorHeader.Margin = new Padding(0, 0, 0, 4);
-        EditorHeader.MinimumSize = new Size(0, ViewButtonSize.Height);
+        EditorHeader.Margin = new Padding(0);
+        EditorHeader.MinimumSize = new Size(0, HeaderHeight);
         EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        EditorHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-
+        EditorHeader.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         EditorHeader.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         EditorHeader.Controls.Add(EditorCaption, 0, 0);
-        EditorHeader.Controls.Add(SaveButton, 1, 0);
-        EditorHeader.Controls.Add(XmlViewButton, 2, 0);
+        EditorHeader.Controls.Add(XmlViewButton, 1, 0);
+        EditorHeader.Controls.Add(SaveButton, 1, 1);
         return EditorHeader;
+    }
+
+    /// <summary>
+    /// The buttons whose width follows their text (Browse, the tabs, save, print) get it: after a language change, and
+    /// after a move to a screen with another scaling (then later, when WinForms has finished scaling the window: a width
+    /// measured in the middle of that would be scaled a second time).
+    /// </summary>
+    private void FitButtonWidthsLater()
+    {
+        if (IsHandleCreated)
+        {
+            BeginInvoke(FitButtonWidths);
+        }
+    }
+
+    private void FitButtonWidths()
+    {
+        foreach (RoundedButton browse in new[] { XmlBrowseButton, CsvBrowseButton })
+        {
+            browse.Width = Math.Max(LogicalToDeviceUnits(FileButtonSize.Width), Math.Max(XmlBrowseButton.WidthNeededForIconAndText(), CsvBrowseButton.WidthNeededForIconAndText()));
+        }
+
+        // "Template (xml)" as wide as its text; "Save template" below it at least as wide as the tab.
+        XmlViewButton.Width = XmlViewButton.WidthNeeded();
+        SaveButton.Width = Math.Max(XmlViewButton.Width, TextRenderer.MeasureText(SaveButton.Text, SaveButton.Font).Width + LogicalToDeviceUnits(28));
+
+        PrintButton.Width = Math.Max(LogicalToDeviceUnits(PrintButtonSize.Width), PrintButton.WidthNeeded());
+        Clock.Width = Clock.WidthNeeded();
+        Clock.Height = Clock.HeightNeeded();
+        LabelCounter.Width = CounterWidthNeeded();
+        LabelCounter.Height = LabelCounter.Font.Height + LogicalToDeviceUnits(4);
+        FitTiles();
+        BottomBar.PerformLayout();
+        ApplyEditorColumnShare(_settings.EditorColumnShare); // the minimum width of the left panel may have changed
     }
 
     /// <summary>
@@ -822,9 +1218,13 @@ internal class MainForm : Form
         CsvGrid.RowHeadersVisible = false;
         CsvGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         CsvGrid.MultiSelect = false;
-        CsvGrid.BorderStyle = BorderStyle.None; // the rounded ContentFrame around it is the border
+        CsvGrid.BorderStyle = BorderStyle.None;
         CsvGrid.BackgroundColor = Theme.White;
-        CsvGrid.GridColor = Theme.PaleBlue;
+        // Lines between the rows AND the columns (Daan, 2026-11-21: "add column separation, so it's a bit more visible"),
+        // a little darker than the light lines of the mockup; the column titles get the same lines.
+        CsvGrid.GridColor = Theme.TableLine;
+        CsvGrid.CellBorderStyle = DataGridViewCellBorderStyle.Single;
+        CsvGrid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
         // NOT AutoSizeColumnsMode.AllCells: that measures every cell of every row when the table is shown, about 1 second
         // per 1000 rows, and the window froze while doing it (Daan, 2026-10-26). FitCsvColumns measures one cell per column.
         CsvGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
@@ -837,17 +1237,19 @@ internal class MainForm : Form
         float points = (Font.SizeInPoints + CsvExtraPoints) * _settings.RowHeightCSV / 100f;
         CsvGrid.Font = new Font(Font.FontFamily, points, FontStyle.Regular, GraphicsUnit.Point);
 
-        // The headers in the colours of the theme (otherwise Windows draws them in its own grey).
+        // The headers in the colours of the theme (otherwise Windows draws them in its own grey): light grey with bold blue
+        // titles, the chosen row in the light blue of the Maestro skin. Its text stays dark (navy on that blue is 6:1;
+        // the white of the mockup would be only 2:1, too pale to read at the reprint station).
         CsvGrid.EnableHeadersVisualStyles = false;
-        CsvGrid.ColumnHeadersDefaultCellStyle.BackColor = Theme.VeryPaleBlue;
-        CsvGrid.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Navy;
-        CsvGrid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Theme.VeryPaleBlue;
-        CsvGrid.ColumnHeadersDefaultCellStyle.SelectionForeColor = Theme.Navy;
+        CsvGrid.ColumnHeadersDefaultCellStyle.BackColor = Theme.Field;
+        CsvGrid.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Text;
+        CsvGrid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Theme.Field;
+        CsvGrid.ColumnHeadersDefaultCellStyle.SelectionForeColor = Theme.Text;
         CsvGrid.ColumnHeadersDefaultCellStyle.Font = new Font(CsvGrid.Font, FontStyle.Bold);
         CsvGrid.DefaultCellStyle.BackColor = Theme.White;
-        CsvGrid.DefaultCellStyle.ForeColor = Theme.Navy;
-        CsvGrid.DefaultCellStyle.SelectionBackColor = Theme.PaleBlue;
-        CsvGrid.DefaultCellStyle.SelectionForeColor = Theme.Navy;
+        CsvGrid.DefaultCellStyle.ForeColor = Theme.Text;
+        CsvGrid.DefaultCellStyle.SelectionBackColor = Theme.Selection;
+        CsvGrid.DefaultCellStyle.SelectionForeColor = Theme.ButtonNavy;
 
         CsvGrid.CurrentCellChanged += (sender, e) => OnCsvRowChosen(); // after the current row has changed (SelectionChanged comes too early)
     }
@@ -1048,20 +1450,20 @@ internal class MainForm : Form
         ShowLeftColumn();
     }
 
-    /// <summary>Shows what was chosen in the left column, and marks the buttons that chose it.</summary>
+    /// <summary>Shows what was chosen in the left column, and marks the tab and the round button that chose it.</summary>
     private void ShowLeftColumn()
     {
         Board.Visible = _showingBoard;
         Editor.Parent!.Visible = !_showingBoard && !_showingCsv;
         CsvGrid.Parent!.Visible = !_showingBoard && _showingCsv;
 
-        // Exactly one of the three is "pressed" (in the brand colour): Template (xml) above the column, or the csv or the
-        // board button below it.
-        Theme.StyleToggleButton(XmlViewButton, selected: !_showingBoard && !_showingCsv);
-        Theme.StyleToggleButton(CsvViewButton, selected: !_showingBoard && _showingCsv);
-        Theme.StyleToggleButton(BoardButton, selected: _showingBoard);
+        // Exactly one of the three is chosen: the template text (its tab is white with a line below it), the csv table or the
+        // board (their round button in the bottom bar gets the dark ring and is 10% bigger).
+        XmlViewButton.Selected = !_showingBoard && !_showingCsv;
+        CsvViewButton.Selected = !_showingBoard && _showingCsv;
+        BoardButton.Selected = _showingBoard;
         Preview.ShowSheetMap = !_showingBoard; // the board shows the sheet big: the small map goes, the label gets its room
-        EditorCaption.Text = LeftColumnCaption();
+        UpdateEditorCaption();
         if (_showingCsv && !_showingBoard)
         {
             SelectCsvRowOfShownLabel(); // the row of the label in the preview
@@ -1069,7 +1471,21 @@ internal class MainForm : Form
     }
 
     private string LeftColumnCaption() =>
-        _showingBoard ? Strings.BoardCaption : _showingCsv ? Strings.CsvCaption : Strings.EditorCaption;
+        _showingBoard || _showingCsv ? Strings.CsvCaption : Strings.EditorCaption;
+
+    /// <summary>
+    /// The title of the left panel (Daan, 2026-11-21). For the csv table AND the board: "Données :", the file name in bold
+    /// (the csv; on the board of a label-xml that xml) and " | 13 étiquette(s)" — this replaced the status line below the
+    /// files and the board's own title. For the template text just "Texte du modèle".
+    /// </summary>
+    private void UpdateEditorCaption()
+    {
+        EditorCaption.Text = LeftColumnCaption();
+        string? file = _csv?.FilePath ?? (_showingBoard ? _currentFile : null);
+        bool withFile = (_showingBoard || _showingCsv) && file != null;
+        EditorCaption.Emphasis = withFile ? Path.GetFileName(file!) : "";
+        EditorCaption.Suffix = withFile ? Strings.LabelCount(Preview.Count) : "";
+    }
 
     /// <summary>The user clicked a row of the csv table: show the (first) label of that csv line.</summary>
     private void OnCsvRowChosen()
@@ -1113,13 +1529,19 @@ internal class MainForm : Form
     /// </summary>
     private Control BuildPreviewHeader()
     {
-        // The title takes the free width (one line, "…" when the column is narrow); the label size what it needs.
+        PreviewCaption.Font = Theme.CreateFont(Font, Font.SizeInPoints + 2);
+        PreviewCaption.ForeColor = Theme.Text;
+        MakeOneLineTitle(PreviewCaption);
+        PreviewCaption.Margin = new Padding(PanelPadding, 0, 8, 0);
+
+        // The title takes the free width (one line, "…" when the column is narrow); the label size what it needs. As
+        // high as the tabs of the left panel, so both panels start their content at the same height.
         PreviewHeader.ColumnCount = 2;
         PreviewHeader.RowCount = 1;
         PreviewHeader.AutoSize = true;
         PreviewHeader.Dock = DockStyle.Fill;
-        PreviewHeader.Margin = new Padding(0, 0, 0, 4);
-        PreviewHeader.MinimumSize = new Size(0, ViewButtonSize.Height);
+        PreviewHeader.Margin = new Padding(0);
+        PreviewHeader.MinimumSize = new Size(0, HeaderHeight);
         PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         PreviewHeader.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         PreviewHeader.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -1129,164 +1551,83 @@ internal class MainForm : Form
     }
 
     /// <summary>
-    /// Below the preview, as wide as the preview (Daan, 2026-10-26): "2 / 3" against its left edge, the two arrows in the
-    /// middle (only when there is more than one label) and the print button against its right edge (as soon as there is
-    /// a label); the three buttons twice as high as the other buttons and as wide as fits (FitNavigationButtons). The row
-    /// is always as high as these buttons, also when they are hidden, so the preview never jumps.
+    /// The bar at the bottom of the window (Daan's mockup, like Maestro's): on the blue band the round csv and board buttons
+    /// at the left and previous / "2 / 3" / next at its round right end; on the grey right of it the print button. The
+    /// buttons are placed by <see cref="BottomBar"/> itself. All of them only when they can be used (UpdateNavigation).
     /// </summary>
-    private Control BuildPreviewNavigation()
+    private Control BuildBottomBar()
     {
-        LabelCounter.AutoSize = true;
-        LabelCounter.Anchor = AnchorStyles.Left;
-        LabelCounter.Margin = new Padding(0);
-        LabelCounter.ForeColor = Theme.Navy;
-        // Bold (Daan, 2026-10-26) and 1.5 x the window's font (Daan, 2026-11-08): easier to read at the reprint station.
-        LabelCounter.Font = new Font(Font.FontFamily, Font.SizeInPoints * CounterFontFactor, FontStyle.Bold, GraphicsUnit.Point);
+        // The csv table (only with a label-csv) and the board (only when the labels know their sheet), with the signs of
+        // the mockup (Daan, 2026-11-21: "use the icons from the Claude mockup"): "CSV" in bold and a drawn board. The one
+        // that is chosen is 10% bigger (GrowWhenSelected).
+        CsvViewButton.Text = Strings.CsvSign;
+        CsvViewButton.Visible = false;
+        CsvViewButton.Click += (sender, e) => { _showingBoard = false; ShowCsvView(true); };
 
-        // The arrow signs twice as big too, to fit the bigger buttons.
-        var arrowFont = new Font(Font.FontFamily, Font.SizeInPoints * 2, FontStyle.Regular, GraphicsUnit.Point);
-        foreach (RoundedButton arrow in new[] { PreviousButton, NextButton })
+        BoardButton.Glyph = DiscGlyph.Board;
+        BoardButton.IconHeight = 30;
+        BoardButton.Visible = false;
+        BoardButton.Click += (sender, e) => ShowBoard(!_showingBoard);
+        foreach (DiscButton disc in new[] { CsvViewButton, BoardButton })
         {
-            arrow.Size = NavigationButtonSize;
-            arrow.Margin = new Padding(0);
-            arrow.Font = arrowFont;
-            Theme.StyleSecondaryButton(arrow);
+            disc.Size = GrowingDiscSize;
+            disc.GrowWhenSelected = true;
         }
 
-        PreviousButton.Text = Strings.PreviousArrow;
-        NextButton.Text = Strings.NextArrow;
-        PreviousButton.Margin = new Padding(0, 0, 4, 0);
+        PreviousButton.Glyph = DiscGlyph.Previous;
+        NextButton.Glyph = DiscGlyph.Next;
+        PreviousButton.IconHeight = NextButton.IconHeight = 24;
         PreviousButton.Click += (sender, e) => ShowLabel(Preview.Index - 1);
         NextButton.Click += (sender, e) => ShowLabel(Preview.Index + 1);
+        PreviousButton.Size = NextButton.Size = DiscSize;
 
-        // The print button: against the right edge of the preview, the same size as the arrows, the printer icon instead
-        // of a text.
-        PrintButton.Size = NavigationButtonSize;
-        PrintButton.Anchor = AnchorStyles.Right;
-        PrintButton.Margin = new Padding(0);
-        PrintButton.Image = AppIcons.Print();
-        PrintButton.IconHeight = 2 * RoundedButton.DefaultIconHeight;
-        Theme.StyleSecondaryButton(PrintButton);
+        // "2 / 3": white and bold on the blue band (5:1), twice the window's font: easy to read at the reprint station.
+        LabelCounter.AutoSize = false;
+        LabelCounter.TextAlign = ContentAlignment.MiddleCenter;
+        LabelCounter.BackColor = Color.Transparent;
+        LabelCounter.ForeColor = Theme.White;
+        LabelCounter.Font = Theme.CreateFont(Font, Font.SizeInPoints * CounterFontFactor, FontStyle.Bold);
+        LabelCounter.Size = new Size(96, 36); // until FitButtonWidths knows the font
+        LabelCounter.FontChanged += (sender, e) => FitButtonWidthsLater();
+
+        // The print button: a pill with the white printer of the mockup in a navy circle, and the text "Print".
+        PrintButton.Size = PrintButtonSize;
+        PrintButton.Visible = false; // as soon as there is a label to print
         PrintButton.Click += (sender, e) => PrintLabels();
+        PrintButton.FontChanged += (sender, e) => FitButtonWidthsLater();
 
-        // Four columns: two equal Percent columns (the counter at the left of the first, print at the right of the
-        // second) around two AutoSize columns with the arrows, which so stay exactly in the middle. This table is NOT
-        // AutoSize: it is as wide as the preview (anchored left and right in the same column) and as high as the buttons
-        // (a fixed height, not stretched: its row of the workspace is AutoSize).
-        PreviewNavigation.ColumnCount = 4;
-        PreviewNavigation.RowCount = 1;
-        PreviewNavigation.AutoSize = false;
-        PreviewNavigation.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
-        PreviewNavigation.Margin = new Padding(0, 20, 0, 0); // the room the footer with Save / Close had above it
-        PreviewNavigation.Height = NavigationButtonSize.Height;
-        PreviewNavigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        PreviewNavigation.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        PreviewNavigation.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        PreviewNavigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        PreviewNavigation.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        PreviewNavigation.Controls.Add(LabelCounter, 0, 0);
-        PreviewNavigation.Controls.Add(PreviousButton, 1, 0);
-        PreviewNavigation.Controls.Add(NextButton, 2, 0);
-        PreviewNavigation.Controls.Add(PrintButton, 3, 0);
-        PreviewNavigation.SizeChanged += (sender, e) => FitNavigationButtons();
-        return PreviewNavigation;
+        BottomBar.Dock = DockStyle.Bottom;
+        BottomBar.Height = BottomBar.BarHeight;
+        BottomBar.Margin = new Padding(0);
+        return BottomBar;
     }
 
     /// <summary>
-    /// The arrows, print and the board button (below the left column) get the same width: as wide as fits in the row below
-    /// the preview, at most 120 (at 100%). That row = 4 button widths + the gap between the arrows + room on both sides
-    /// (as before 2026-11-08), and the half left of the arrows must also hold the (bigger) counter. Narrower than 72 only
-    /// when the preview column is dragged very narrow with a long counter, down to <see cref="NavigationButtonSmallestWidth"/>.
-    /// Called when the row changes width (the window, the column line) and when another file is opened (the counter).
-    /// </summary>
-    private void FitNavigationButtons()
-    {
-        int sideRoom = LogicalToDeviceUnits(NavigationSideRoom);
-        int rowWidth = PreviewNavigation.Width - PreviousButton.Margin.Right;
-        int fits = Math.Min((rowWidth - 2 * sideRoom) / 4,                  // the four widths and room on both sides
-                            rowWidth / 2 - CounterWidthNeeded() - sideRoom); // the counter beside the left arrow
-        int width = Math.Max(LogicalToDeviceUnits(NavigationButtonSmallestWidth),
-                             Math.Min(LogicalToDeviceUnits(NavigationButtonMaximumWidth), fits));
-        foreach (RoundedButton button in new[] { CsvViewButton, BoardButton, PreviousButton, NextButton, PrintButton })
-        {
-            if (button.Width != width) // also stops the loop: a new width lays the row out again
-            {
-                button.Width = width;
-            }
-        }
-    }
-
-    /// <summary>
-    /// The width of the widest counter of the open file ("88 / 88" for 10 – 99 labels): the buttons do not change width
-    /// while going through the labels, only when a file with more or fewer digits is opened.
+    /// The width of the widest counter of the open file ("88 / 88" for 10 – 99 labels): the arrows do not move while going
+    /// through the labels, only when a file with more or fewer digits is opened.
     /// </summary>
     private int CounterWidthNeeded()
     {
         string digits = new('8', Math.Max(1, Preview.Count).ToString(System.Globalization.CultureInfo.InvariantCulture).Length);
-        return TextRenderer.MeasureText(digits + " / " + digits, LabelCounter.Font).Width;
+        return TextRenderer.MeasureText(digits + " / " + digits, LabelCounter.Font).Width + LogicalToDeviceUnits(8);
     }
 
-    /// <summary>The company logo at the bottom left of the window (below the editor), opens rogiers.be.</summary>
+    /// <summary>
+    /// The ROGIERS logo in the top bar (Daan's mockup; it was at the bottom left in 1.x): opens rogiers.be, Shift+click
+    /// opens settings.json (<see cref="LogoClicked"/>).
+    /// </summary>
     private Control BuildLogo()
     {
         LogoPicture.Image = AppIcons.CompanyLogo();
         LogoPicture.SizeMode = PictureBoxSizeMode.Zoom; // keeps the proportions of the logo
         LogoPicture.Size = LogoSize;
-        LogoPicture.BackColor = Theme.White;
-        LogoPicture.Anchor = AnchorStyles.Left | AnchorStyles.Bottom; // its bottom in line with the bottom of the big buttons
-        LogoPicture.Margin = new Padding(0);
+        LogoPicture.BackColor = Theme.TopBar;
+        LogoPicture.Anchor = AnchorStyles.Left; // in the middle of the bar's height
+        LogoPicture.Margin = new Padding(16, 0, 0, 0);
         LogoPicture.Cursor = Cursors.Hand;
         _toolTip.SetToolTip(LogoPicture, Strings.CompanyName);
         LogoPicture.Click += (sender, e) => LogoClicked(shiftDown: (ModifierKeys & Keys.Shift) == Keys.Shift);
         return LogoPicture;
-    }
-
-    /// <summary>
-    /// The last row below the LEFT column: the logo at the left and, against the vertical line (Daan, 2026-11-08), the
-    /// csv button and the board button — below the column they change, and just left of the counter below the preview.
-    /// Together they are the switch between the csv table and the board. Not AutoSize: as wide as the column and as high
-    /// as the row below the preview (20 px room + a big button), so the bottoms line up.
-    /// </summary>
-    private Control BuildLeftBottomRow()
-    {
-        // The csv table (Daan, 2026-11-08: was the "Label-csv" text button above the column). Only with a label-csv.
-        CsvViewButton.Size = NavigationButtonSize;
-        CsvViewButton.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
-        CsvViewButton.Margin = new Padding(0, 0, 4, 0); // the same gap as between the arrows
-        CsvViewButton.Image = AppIcons.Csv();
-        CsvViewButton.IconHeight = 3 * RoundedButton.DefaultIconHeight / 2; // the tag is twice as wide as high: still fits a narrow button
-        CsvViewButton.TabStop = false;
-        CsvViewButton.Visible = false; // only with a label-csv (UpdateNavigation)
-        Theme.StyleToggleButton(CsvViewButton, selected: false);
-        CsvViewButton.Click += (sender, e) => { _showingBoard = false; ShowCsvView(true); };
-
-        BoardButton.Size = NavigationButtonSize;
-        BoardButton.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
-        BoardButton.Margin = new Padding(0);
-        BoardButton.Image = AppIcons.Board();
-        BoardButton.IconHeight = 2 * RoundedButton.DefaultIconHeight;
-        BoardButton.TabStop = false; // like print: Tab only goes through the four fields
-        BoardButton.Visible = false; // only when the labels know their sheet (UpdateNavigation)
-        Theme.StyleToggleButton(BoardButton, selected: false);
-        BoardButton.Click += (sender, e) => ShowBoard(!_showingBoard);
-
-        var row = new TableLayoutPanel
-        {
-            ColumnCount = 3,
-            RowCount = 1,
-            AutoSize = false,
-            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
-            Margin = new Padding(0),
-            Height = PreviewNavigation.Margin.Top + NavigationButtonSize.Height,
-        };
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        row.Controls.Add(BuildLogo(), 0, 0);
-        row.Controls.Add(CsvViewButton, 1, 0);
-        row.Controls.Add(BoardButton, 2, 0);
-        return row;
     }
 
     /// <summary>
@@ -1406,21 +1747,6 @@ internal class MainForm : Form
         Preview.RotationClockwise = _settings.LabelRotationIsClockwise;
     }
 
-    /// <summary>A thin horizontal line over the full width, in the pale blue of the theme.</summary>
-    private void AddDivider(TableLayoutPanel table, ref int row, Padding margin)
-    {
-        var line = new Panel { Height = 1, Dock = DockStyle.Fill, BackColor = Theme.PaleBlue, Margin = margin };
-        Dividers.Add(line);
-        AddRow(table, ref row, line);
-    }
-
-    private static void AddRow(TableLayoutPanel table, ref int row, Control control)
-    {
-        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        table.Controls.Add(control, 0, row);
-        row++;
-    }
-
     // ------------------------------------------------------------------ language
 
     /// <summary>Puts every text in the selected language. Called at the start and after a language change.</summary>
@@ -1428,33 +1754,41 @@ internal class MainForm : Form
     {
         UpdateTitle();
         VersionLabel.Text = Strings.AppVersion(AppInfo.Version);
-        _toolTip.SetToolTip(UserGuidePicture, Strings.UserGuideTooltip);
+        _toolTip.SetToolTip(UserGuideButton, Strings.UserGuideTooltip);
+        UserGuideButton.AccessibleName = Strings.UserGuideTooltip; // a sign, no text: for a screen reader
+        FilesCaption.Text = Strings.FilesCaption;
         string howTo = WrapForToolTip(Strings.FileDescription, HowToLineLength);
-        HowToToolTip.SetToolTip(XmlHowToPicture, howTo);
-        HowToToolTip.SetToolTip(CsvHowToPicture, howTo);
+        HowToToolTip.SetToolTip(FilesHowToPicture, howTo);
+        _toolTip.SetToolTip(XmlFoldButton, XmlFoldButton.Folded ? Strings.UnfoldFileLine : Strings.FoldFileLine);
+        _toolTip.SetToolTip(CsvFoldButton, CsvFoldButton.Folded ? Strings.UnfoldFileLine : Strings.FoldFileLine);
         XmlFileCaption.Text = Strings.XmlFileCaption;
         CsvFileCaption.Text = Strings.CsvFileCaption;
         XmlBrowseButton.Text = Strings.Browse;
         CsvBrowseButton.Text = Strings.Browse;
-        EditorCaption.Text = LeftColumnCaption();
+        UpdateEditorCaption();
         XmlViewButton.Text = Strings.XmlViewButton;
         _toolTip.SetToolTip(CsvViewButton, Strings.CsvViewTooltip);
         CsvViewButton.AccessibleName = Strings.CsvViewTooltip; // a picture, no text: for a screen reader
         PreviewCaption.Text = Strings.PreviewCaption;
         LabelSizeCaption.Text = Strings.LabelSizeCaption;
+        PositionTile.Caption = Strings.PositionTile;
+        SheetTile.Caption = Strings.SheetTile;
         _toolTip.SetToolTip(LabelLengthBox, Strings.LabelLengthTooltip);
         _toolTip.SetToolTip(LabelWidthBox, Strings.LabelWidthTooltip);
         _toolTip.SetToolTip(PreviousButton, Strings.PreviousLabel);
+        PreviousButton.AccessibleName = Strings.PreviousLabel;
         _toolTip.SetToolTip(NextButton, Strings.NextLabel);
+        NextButton.AccessibleName = Strings.NextLabel;
+        PrintButton.Text = Strings.PrintButtonText;
         string printTooltip = _settings.HideWindowsPrintDialog ? Strings.PrintTooltipWithoutDialog : Strings.PrintTooltip;
         _toolTip.SetToolTip(PrintButton, printTooltip);
-        PrintButton.AccessibleName = printTooltip; // the button has a picture, no text: for a screen reader
+        PrintButton.AccessibleName = printTooltip; // says whether a dialog follows: for a screen reader
         _toolTip.SetToolTip(BoardButton, Strings.BoardTooltip);
         BoardButton.AccessibleName = Strings.BoardTooltip;
         _toolTip.SetToolTip(ColumnDivider, Strings.ColumnDividerTooltip);
         SaveButton.Text = Strings.SaveTemplate;
-        FitFileTexts(); // the description has another length in another language
-        RefreshPreview(newFile: false); // the preview's messages and the status line are in the language too
+        FitButtonWidths(); // the texts have another length in another language
+        RefreshPreview(newFile: false); // the preview's messages and the panel titles are in the language too
     }
 
     private void ChangeLanguage()
@@ -1855,8 +2189,7 @@ internal class MainForm : Form
         Editor.MarkVariables();
         _isLabelXml = labels is { Error: null, Kind: LabelFileKind.LabelXml };
         UpdateCsvLine();
-        UpdateNavigation();
-        UpdateFileStatus(labels);
+        UpdateNavigation(); // also the title of the left panel (the number of labels)
 
         // ShowBoardByDefault (settings.json, Daan 2026-11-08): every newly opened file (also the ones opened again at the
         // start) is shown on the board, when its labels know their sheet. Closing the board stays possible.
@@ -1904,7 +2237,8 @@ internal class MainForm : Form
         // Print: as soon as there is a label to print (also just one); not for broken xml or an empty label file.
         PrintButton.Visible = count > 0;
 
-        // "Template (xml)" and the csv button only with a label-csv that is used; the csv table follows the label of the preview.
+        // "Template (xml)" and the csv button only with a label-csv that is used; the csv table follows the label of the
+        // preview.
         bool csv = _csv != null && !_isLabelXml;
         XmlViewButton.Visible = csv;
         CsvViewButton.Visible = csv;
@@ -1921,23 +2255,47 @@ internal class MainForm : Form
             ShowBoard(false);
         }
 
-        FitNavigationButtons(); // the counter of another file may need more room
+        // The counter of another file may need more room; the bar places its buttons again (some appeared or went).
+        int counterWidth = CounterWidthNeeded();
+        if (LabelCounter.Width != counterWidth)
+        {
+            LabelCounter.Width = counterWidth;
+        }
 
+        BottomBar.PerformLayout();
+        UpdateTiles();
+        UpdateEditorCaption(); // the number of labels in the title
         SelectCsvRowOfShownLabel();
     }
 
-    /// <summary>The line below the path boxes: what kind of file is open, with how many labels.</summary>
-    private void UpdateFileStatus(LabelSet? labels)
+    /// <summary>
+    /// The two tiles below the preview: where the shown label sits (X, Y, its ID and rotation) and the size of its sheet.
+    /// A dash when there is no label (nothing open, broken xml) or no sheet size. X or Y that is not a number: "?".
+    /// </summary>
+    private void UpdateTiles()
     {
-        FileStatus.Text = labels switch
+        LabelItem? label = Preview.Count > 0 && Preview.Labels!.Error == null ? Preview.Labels.Labels[Preview.Index] : null;
+        if (label == null)
         {
-            null when _csv != null => Strings.StatusCsvWithoutTemplate,
-            null => Strings.StatusNothingOpen,
-            { Error: not null } => Strings.StatusXmlError,
-            { Kind: LabelFileKind.LabelXml } => Strings.StatusLabelXml(labels.Labels.Count),
-            _ when _csv != null => Strings.StatusTemplateWithCsv(labels.Labels.Count),
-            _ => Strings.StatusTemplateWithoutCsv,
-        };
+            PositionTile.Value = Strings.NoValue;
+            PositionTile.Line1 = PositionTile.Line2 = "";
+            SheetTile.Value = Strings.NoValue;
+            SheetTile.Line1 = SheetTile.Line2 = "";
+            return;
+        }
+
+        static string Number(double? value) => value is double number ? LabelXml.Format(number) : "?";
+
+        PositionTile.Value = string.Format(System.Globalization.CultureInfo.InvariantCulture, Strings.PositionFormat, Number(label.X), Number(label.Y));
+        PositionTile.Line1 = Strings.Millimetres;
+        PositionTile.Line2 = Strings.LabelDetails(label.Id, label.Rotation.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        bool hasSheet = label.SheetLength > 0 && label.SheetWidth > 0;
+        SheetTile.Value = hasSheet
+            ? string.Format(System.Globalization.CultureInfo.InvariantCulture, Strings.SheetSizeFormat, LabelXml.Format(label.SheetLength!.Value), LabelXml.Format(label.SheetWidth!.Value))
+            : Strings.NoValue;
+        SheetTile.Line1 = hasSheet ? Strings.Millimetres : "";
+        SheetTile.Line2 = "";
     }
 
     /// <summary>
@@ -2002,6 +2360,12 @@ internal class MainForm : Form
         if (keyData == (Keys.Control | Keys.O))
         {
             BrowseForXmlFile();
+            return true;
+        }
+
+        if (keyData == Keys.F11)
+        {
+            ToggleFullScreen(); // like a browser: the whole monitor, without the taskbar
             return true;
         }
 
@@ -2120,6 +2484,7 @@ internal class MainForm : Form
         if (disposing)
         {
             _previewTimer.Dispose();
+            _clockTimer.Dispose();
             _toolTip.Dispose();
         }
 

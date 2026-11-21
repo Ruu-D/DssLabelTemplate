@@ -21,15 +21,76 @@ internal static class Theme
     public static readonly Color LabelInk = Color.Black;
     public static readonly Color LabelPaper = Color.White;
 
+    // ---- 2.0.0: the "Maestro" skin (Daan, 2026-11-21). The customer works all day with the SCM machine software (Maestro),
+    //      so the window takes over its colours: a light grey frame, white panels with blue titles, navy buttons, a grey
+    //      work area behind the label, and a blue bar at the bottom with round light-blue buttons. The colours come from
+    //      the mockup Daan approved (claude.ai artifact "DssLabelTemplate Maestro skin"); the brand colours above stay for
+    //      the XML editor, the busy layer and the logo.
+
+    public static readonly Color Frame = ColorTranslator.FromHtml("#D9DADC");        // the window around the panels
+    public static readonly Color TopBar = ColorTranslator.FromHtml("#DCDDDF");       // the bar at the top
+    public static readonly Color WorkArea = ColorTranslator.FromHtml("#B8BCC0");     // behind the label, the board, and the bottom bar's right end
+    public static readonly Color Field = ColorTranslator.FromHtml("#EEEFF1");        // path boxes, label size, table titles
+    public static readonly Color TabIdle = ColorTranslator.FromHtml("#DCDFE3");      // a tab that is not chosen
+    public static readonly Color XmlTabIdle = ColorTranslator.FromHtml("#C9CDD3");   // "Template (xml)" when not chosen; disabled buttons
+    public static readonly Color ButtonNavy = ColorTranslator.FromHtml("#0B2C6B");   // Browse, save, the shown label on the board
+    public static readonly Color ButtonNavyHover = ColorTranslator.FromHtml("#173F86");
+    public static readonly Color ButtonNavyPressed = ColorTranslator.FromHtml("#052F61"); // also the ring of a chosen round button
+    public static readonly Color Text = ColorTranslator.FromHtml("#1D4486");         // titles and text (9:1 on white)
+    public static readonly Color TextSoft = ColorTranslator.FromHtml("#3A5A8F");     // the status line, the subtitle
+    public static readonly Color DisabledText = ColorTranslator.FromHtml("#5C6B82"); // text on a disabled (grey) button
+    public static readonly Color Selection = ColorTranslator.FromHtml("#8EB3E4");    // the chosen table row, the tab underline
+    public static readonly Color OtherLabel = ColorTranslator.FromHtml("#7FA8DE");   // the other labels on the sheet map / board
+    public static readonly Color GridLine = ColorTranslator.FromHtml("#E1E4E8");     // the thin line below the left panel's title
+    public static readonly Color TableLine = ColorTranslator.FromHtml("#C9CED6");    // the lines between the rows and columns of the csv table
+    public static readonly Color Separator = ColorTranslator.FromHtml("#B9BDC3");    // the short line before the credit
+    public static readonly Color Shadow = ColorTranslator.FromHtml("#9EA2A6");       // under the label, the sheet and the title tab
+    public static readonly Color TileValue = ColorTranslator.FromHtml("#4E7FC6");    // the big numbers of the tiles (bold, large: 4:1)
+    public static readonly Color TileLine = ColorTranslator.FromHtml("#3F6FB5");     // the small lines of the tiles (5:1)
+    public static readonly Color BarTop = ColorTranslator.FromHtml("#4C7BC0");       // the blue bottom bar, top ...
+    public static readonly Color BarBottom = ColorTranslator.FromHtml("#3561A6");    // ... and bottom of its gradient
+    public static readonly Color Pill = ColorTranslator.FromHtml("#E4E7EC");         // the print button at the bottom right
+
+    // The round buttons of the bottom bar: a light-blue disc (lighter at the top left) with a pale ring. DiscSoftLight is
+    // the light spot at rest (Daan, 2026-11-21: "make the white gradient fade less visible"); DiscLight under the mouse.
+    public static readonly Color DiscSoftLight = ColorTranslator.FromHtml("#DCE7F6");
+    public static readonly Color DiscLight = ColorTranslator.FromHtml("#F4F8FD");
+    public static readonly Color DiscMiddle = ColorTranslator.FromHtml("#C9DAF0");
+    public static readonly Color DiscEdge = ColorTranslator.FromHtml("#9DB9E2");
+    public static readonly Color DiscRing = ColorTranslator.FromHtml("#E8EFF9");
+
+    // The window's own minimise / maximise / close buttons and the clock in the top bar (Daan's Maestro screenshot,
+    // 2026-11-21): dark grey squares with a white sign (white on #3A3D42 is 11:1).
+    public static readonly Color WindowButton = ColorTranslator.FromHtml("#3A3D42");
+    public static readonly Color WindowButtonHover = ColorTranslator.FromHtml("#55595F");
+    public static readonly Color WindowButtonPressed = ColorTranslator.FromHtml("#202225");
+
+    // The edge around the window, now that it has no Windows frame: the room where it can be resized.
+    public static readonly Color WindowEdge = ColorTranslator.FromHtml("#9EA2A6");
+
+    // The round navy buttons (the user guide "?") and the round blue disc behind the logo in the title tab.
+    public static readonly Color DarkDiscLight = ColorTranslator.FromHtml("#3D72C4");
+    // The disc behind the logo uses the blues of the bottom bar (Daan, 2026-11-21: "the same color blue as the bar below"),
+    // with a slightly lighter spot at the top left so it still looks round. The app icon's square uses the bar's gradient.
+    public static readonly Color LogoDiscLight = ColorTranslator.FromHtml("#6E97D2");
+    public static readonly Color LogoDiscMiddle = BarTop;
+    public static readonly Color LogoDiscEdge = BarBottom;
+
     /// <summary>
-    /// The font of the windows: "Segoe UI Variable Text", the font of Windows 11, if it is installed;
-    /// otherwise the normal Windows font. Same size as before (9 pt).
+    /// The font of the window: Verdana, like the Maestro screens (Daan's mockup, 2026-11-21); it is on every Windows PC.
+    /// 8.5 pt: Verdana is wider than Segoe UI, so this is about as big on the screen as the 9 pt Segoe UI of 1.x.
     /// </summary>
     public static Font CreateBodyFont()
     {
         using var installed = new System.Drawing.Text.InstalledFontCollection();
-        bool hasVariable = installed.Families.Any(family => family.Name == "Segoe UI Variable Text");
-        return hasVariable ? new Font("Segoe UI Variable Text", 9F) : Control.DefaultFont;
+        bool hasVerdana = installed.Families.Any(family => family.Name == "Verdana");
+        return hasVerdana ? new Font("Verdana", 8.5F) : Control.DefaultFont;
+    }
+
+    /// <summary>A font of the window's family in another size and style (titles, tiles, the counter).</summary>
+    public static Font CreateFont(Font body, float points, FontStyle style = FontStyle.Regular)
+    {
+        return new Font(body.FontFamily, points, style, GraphicsUnit.Point);
     }
 
     /// <summary>The font of the text editor: Consolas, like Notepad, so the lines of a template line up.</summary>
@@ -79,21 +140,33 @@ internal static class Theme
     }
 
     /// <summary>
-    /// One of two buttons that choose a view (template text / csv data): the chosen one is filled with the brand colour,
-    /// the other looks like a second button. The font stays regular for both, so the buttons never change size.
+    /// The navy button of the Maestro skin (2.0.0): Browse and "Save template". White text on navy (13:1), almost square
+    /// corners like the Maestro "+" buttons; a button that cannot be pressed (the csv line next to a label-xml) is grey.
     /// </summary>
-    public static void StyleToggleButton(RoundedButton button, bool selected)
+    public static void StyleNavyButton(RoundedButton button)
     {
-        StyleSecondaryButton(button);
-        if (selected)
-        {
-            button.NormalFill = Brand;
-            button.HoverFill = Brand;
-            button.PressedFill = Brand;
-            button.BorderColor = Color.Empty;
-        }
+        button.NormalFill = ButtonNavy;
+        button.HoverFill = ButtonNavyHover;
+        button.PressedFill = ButtonNavyPressed;
+        button.BorderColor = Color.Empty;
+        button.NormalText = White;
+        button.HoverText = White;
+        button.DisabledFill = XmlTabIdle;
+        button.DisabledText = DisabledText;
+        button.Radius = 2;
+        button.Cursor = Cursors.Hand;
+    }
 
-        button.Invalidate();
+    /// <summary>
+    /// A text box or big control in the Maestro skin: a flat light-grey field without a border (the editor and the table
+    /// get their own background). The dark line at the bottom while it has the focus stays.
+    /// </summary>
+    public static void StyleField(RoundedFrame frame, Color fill)
+    {
+        frame.FillColor = fill;
+        frame.BorderColor = Color.Empty;
+        frame.Radius = 0;
+        frame.FocusColor = ButtonNavy;
     }
 
     // ---- The colours of the XML editor (Scintilla). Navy and dark blue for text, the pale blues behind it, on a light grey

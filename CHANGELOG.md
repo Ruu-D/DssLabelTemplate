@@ -1,5 +1,91 @@
 # Changelog
 
+## 2.0.0 — 2026-11-21 — FIRST CUSTOMER RELEASE in the "Maestro" skin (Daan)
+
+- **Delivery:** `dist\v2.0.0\DssLabelTemplate.exe`, 54,576,664 bytes, file version 2.0.0.0, SHA-256
+  `4dca209ffa05ba361e498722bf84b2cc01bb289c13208556be34d9da5638a806`. Built by `publish.cmd` after all 244 tests passed;
+  started once with a scratch data folder (window opened, data folder written).
+- 2.0.0 = 2.0.0-alpha (below) + the five rounds of Daan's changes listed here, + the French "Version de l'application"
+  shortened to "Version app". The README pictures (`media/preview/MainUI-preview.png`, `Board-preview.png`) were
+  rendered again: English, the samples HUPPY-PINCKAERS-60x60 + DAAN_ROGIERS-P2026.09_001, label 60 x 60, left column 60%,
+  at 150% (the only monitor connected).
+
+### The changes after 2.0.0-alpha (Daan's five rounds, 2026-11-21)
+
+- **Fixed: squares around the round buttons and the print button** on the real screen (white / grey corners, a strange
+  hover). They used BackColor = Transparent; now each one asks the bottom bar to paint its band into the button
+  (`IPaintsBackgroundForChildren`, `ShapedButton.PaintParentBackground`). A rendered picture (DrawToBitmap) did not show
+  the problem, so this must be checked on a real screen.
+- **The "Table" and "Board" tabs are gone** (Daan: "since the buttons on the bar below work"); only "Template (xml)" is
+  left in the left panel's title, with "Save template" right below it (both against the panel's right edge).
+- **The signs of the mockup** on the round buttons and print (Daan: "better than mine"): "CSV" in bold, a drawn board
+  (`DiscGlyph.Board`), a drawn printer (`MaestroDrawing.DrawPrinterIcon`). The pictures `CSV.png`, `Board.png`,
+  `Print.png` are no longer used in the window.
+- **The white fade in the round buttons is softer** (`Theme.DiscSoftLight`; the brighter spot only under the mouse).
+- **The chosen csv or board button is 10% bigger** (`DiscButton.GrowWhenSelected`: the button is 66 x 66, the disc is
+  drawn at 60 and fills the 66 when chosen, so nothing moves).
+- **No Windows title bar** (Daan, like Maestro): the top bar has a clock (`ClockDisplay`, "HH:mm") and the minimise,
+  maximise and close buttons (`WindowButton`, dark grey squares with a white sign). Dragging the top bar moves the window
+  (also to another monitor, snapping to the edges), a double-click maximises it or back; a 4 px edge around the window
+  resizes it; maximised it keeps the taskbar free (`NativeWindowMethods`). Close still asks about unsaved changes.
+  Window 1180 x 820 at 100%, at least 960 x 640.
+- **F11 = full screen**, like a browser (Daan): the window covers the whole monitor, the Windows taskbar included; F11
+  again, or the maximise button, goes back (`ToggleFullScreen`; a maximised window whose maximised size is then the
+  whole monitor, `NativeWindowMethods.LimitMaximizedToWorkingArea(wholeMonitor)`).
+- The name in the title tab 2 pt bigger (body + 7 pt), the line below it bold.
+- The ROGIERS logo and the "?" as high as the clock sign (18 px at 100%); the "?" flat and dark grey like the clock
+  (`DiscButton.Flat`), its button 28 x 28 so it is still easy to hit.
+- 242 tests (the window test now also checks F11 and the sizes of the logo and the "?").
+- Third round (Daan): the clock's digits as high as the clock sign (`ClockDisplay.TimeFont`); the name and the line below
+  it in the title tab start at the same left edge (`NoPadding`: Windows' extra room before a text grows with the font);
+  the white title tab sticks to the top of the window (no grey above it: no resize edge at the top, the top corners
+  still resize); the chosen csv / board button 20% bigger (was 10%; 72 x 72, the disc 60 at rest) with a short white
+  line below it in the bar, like Maestro.
+- The round disc behind the logo in the title tab and the app icon's square (exe, taskbar, title of a shortcut) in the
+  blue of the bottom bar (Daan: "the same color blue as the bar below"; they were a brighter blue); the logo on the disc
+  20% bigger. `media\app.ico`, `icon-256.png` and `icon-512.png` written again with `--write-icon` (`header.png` stayed
+  the same).
+- Fourth round (Daan): the csv table's title is "Gegevens = / Données = / Data =" followed by the csv's file name in
+  bold (`TitleLabel.Emphasis`); the right panel's title is "Label" / "Étiquette" / "Label" (the same word in Dutch and
+  English on purpose: an exception in `LocalizationTests`); the two "?" before the file lines became ONE "?" right after
+  "Label files" (`FilesHowToPicture`); each file line got a "v" (`FoldButton`) that folds it up to its caption and path
+  as one line of text, so the panels below get about 20 px per line; remembered in settings.json (`XmlFileLineFolded`,
+  `CsvFileLineFolded`, window settings). 244 tests.
+- Fifth round (Daan): the title of the csv table AND of the board is "Gegevens : / Données : / Data :" + the file name in
+  bold + "  |  13 label(s)" (`TitleLabel.Suffix`, `Strings.LabelCount`; on the board of a label-xml: that xml's name);
+  when the column is narrow the name ends in "…" and the count stays. The status line below the file lines is gone
+  (its count is in that title, the preview shows what to do when nothing or broken xml is open), and so is the board's
+  own title "Plaat met de labelposities". The csv table has lines between the columns too, a little darker
+  (`Theme.TableLine`). 244 tests.
+
+## 2.0.0-alpha — 2026-11-21 — the "Maestro" skin (Daan)
+
+A test version with a new look; the functions are exactly those of 1.2.1.
+
+- **Delivery:** `dist\v2.0.0-alpha\DssLabelTemplate.exe`, 54,567,694 bytes, file version 2.0.0.0 (product version
+  2.0.0-alpha), SHA-256 `8298e3ce21df0ceef7ea6efbba2a647b0747ccbc6d72c220bfc499f950e2483b`. Built by `publish.cmd` after
+  all 241 tests passed; started once with a scratch data folder (window opened, data folder written).
+- **Why:** the customer works all day with the SCM machine software (Maestro) and likes its colours. Claude made a mockup
+  (claude.ai artifact "DssLabelTemplate Maestro skin", a table view and a board view); Daan tweaked it and asked for this
+  version: "the functions of the app remain exactly the same as version 1.2.1", the Shift+click on the ROGIERS logo kept,
+  and a save button just below "Template (xml)" when the xml is edited.
+- **The new window** (CLAUDE.md §5): a grey top bar with a white title tab (logo on a blue disc, name, subtitle), the
+  language, the credit and version on two small lines, the ROGIERS logo (still Shift+click = settings.json) and a round
+  navy "?"; a white panel "Label files" with flat grey path boxes and navy Browse buttons with a folder; two white panels:
+  left three tabs (Template (xml) / Table / Board) with "Save template" just below "Template (xml)" after a change, right
+  the preview on a grey work area with the sheet map LEFT of the label, and two tiles below it (Position: X, Y, label ID,
+  rotation; Sheet: its size), which replace the info line below the label; at the bottom a blue bar with round buttons
+  (csv table, board, ◀ counter ▶; the chosen one with a dark ring) and a grey print button "Print" with the printer.
+- Font Verdana 8.5 pt (like Maestro). Window 1100 x 820 at 100% (was 940 x 780), at least 900 x 640. The banner is gone
+  from the window (`AppIcons.Banner` stays for the README picture). The grey gap between the panels is the draggable
+  divider (14 px). The selected table row is light blue with navy text (the mockup's white text would be too pale).
+- A problem with the shown label (objects outside, a variable not in the csv) is a red line in a white box over the
+  bottom of the work area; a message ("choose a file", an xml error) is in a white box too.
+- The version in the window is now the full `<Version>` of the csproj, with "-alpha" (`AppInfo`).
+- 241 tests (window tests rewritten for the new layout; new: the tiles, the map beside the label, the version text).
+  Checked with the render program at 150% (the only monitor connected), in Dutch, French and English, in the table, board,
+  edited-xml and label-xml views and in the narrowest window.
+
 ## 1.2.1 — 2026-11-19 — no code for an empty value (Daan)
 
 - **Delivery:** `dist\v1.2.1\DssLabelTemplate.exe`, 54,561,815 bytes, file version 1.2.1.0, SHA-256

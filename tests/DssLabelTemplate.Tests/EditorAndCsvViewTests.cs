@@ -296,7 +296,7 @@ public class EditorAndCsvViewTests
     [InlineData(AppLanguage.Dutch)]
     [InlineData(AppLanguage.French)]
     [InlineData(AppLanguage.English)]
-    public void TheViewButtons_FitTheirText_AndEndInLineWithTheEditor(AppLanguage language)
+    public void TheXmlTab_FitsItsText_AndEndsInLineWithTheEditor(AppLanguage language)
     {
         Sta.Run(() =>
         {
@@ -306,14 +306,11 @@ public class EditorAndCsvViewTests
             form.OpenLabelFiles(Samples.File(Samples.Template), Samples.File(Samples.Csv));
             window.Pump();
 
-            foreach (Button button in new Button[] { form.XmlViewButton })
-            {
-                int needed = TextRenderer.MeasureText(button.Text, button.Font).Width;
-                Assert.True(needed + 8 <= button.Width, $"'{button.Text}' needs {needed} in a button of {button.Width}");
-            }
+            TabButton tab = form.XmlViewButton;
+            Assert.True(tab.WidthNeeded() <= tab.Width, $"'{tab.Text}' needs {tab.WidthNeeded()} in a tab of {tab.Width}");
 
             int Right(Control control) => control.PointToScreen(new Point(control.Width, 0)).X;
-            Assert.Equal(Right(form.EditorArea), Right(form.XmlViewButton));
+            Assert.Equal(Right(form.EditorArea), Right(tab));
         });
     }
 }

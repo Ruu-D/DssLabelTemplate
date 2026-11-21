@@ -1,9 +1,9 @@
 namespace DssLabelTemplate;
 
 /// <summary>
-/// The board view (Daan, 2026-11-08): the "View board" button below the preview replaces the left column with this — the
-/// sheet seen from above with ONLY the label positions, as big as the column allows, on the same very pale blue panel as
-/// the preview. It is the small sheet map below the label, made big: drawn by the same code
+/// The board view (Daan, 2026-11-08): the board button (the round one in the bottom bar, or the "Board" tab) replaces the
+/// left column with this — the sheet seen from above with ONLY the label positions, as big as the column allows, on the
+/// same grey work area as the preview (2.0.0). It is the small sheet map of the preview, made big: drawn by the same code
 /// (<see cref="LabelPreview.DrawSheetMap"/>), so it follows the same corner, turn and label size, and the label shown in
 /// the preview is the one in the brand colour.
 /// </summary>
@@ -30,6 +30,19 @@ internal class SheetBoard : Control
         _preview.Invalidated += (sender, e) => Invalidate();
     }
 
+    /// <summary>
+    /// Where the sheet is drawn: the room inside the margin, without the line at the bottom that says a label can be
+    /// tapped (2.0.0). Used for drawing AND for finding the tapped label, so the two can never disagree.
+    /// </summary>
+    internal Rectangle SheetArea()
+    {
+        Rectangle inside = LabelPreview.PanelInside(this);
+        int hint = Font.Height + LogicalToDeviceUnits(HintGap);
+        return new Rectangle(inside.Left, inside.Top, inside.Width, Math.Max(0, inside.Height - hint));
+    }
+
+    private const int HintGap = 10; // between the sheet and the line below it, at 100%
+
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics;
@@ -38,13 +51,19 @@ internal class SheetBoard : Control
         if (!_preview.ShownLabelHasSheet)
         {
             // Normally not seen: the button is only there when the labels know their sheet.
-            TextRenderer.DrawText(g, Strings.BoardWithoutSheet, Font, inside, Theme.Navy,
+            TextRenderer.DrawText(g, Strings.BoardWithoutSheet, Font, inside, Theme.Text,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
             return;
         }
 
-        LabelPreview.DrawSheetMap(g, this, inside, _preview.Labels!.Labels, _preview.Index, _preview.LabelSize,
+        Rectangle sheet = SheetArea();
+        LabelPreview.DrawSheetMap(g, this, sheet, _preview.Labels!.Labels, _preview.Index, _preview.LabelSize,
             _preview.SheetRotation, _preview.ReferenceCorner);
+
+        // "· Tap a label to show it ·" below the sheet (Daan's mockup).
+        var hintLine = new Rectangle(inside.Left, inside.Bottom - Font.Height, inside.Width, Font.Height);
+        TextRenderer.DrawText(g, Strings.BoardHint, Font, hintLine, Theme.ButtonNavy,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
     }
 
     /// <summary>
@@ -58,7 +77,7 @@ internal class SheetBoard : Control
             return -1;
         }
 
-        return LabelPreview.FindLabelAt(this, LabelPreview.PanelInside(this), _preview.Labels!.Labels, _preview.Index,
+        return LabelPreview.FindLabelAt(this, SheetArea(), _preview.Labels!.Labels, _preview.Index,
             _preview.LabelSize, _preview.SheetRotation, _preview.ReferenceCorner, point, LogicalToDeviceUnits(TapReach));
     }
 

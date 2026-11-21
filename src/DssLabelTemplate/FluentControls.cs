@@ -53,6 +53,13 @@ internal class RoundedButton : Button
     internal Color NormalText = Theme.Navy;
     internal Color HoverText = Theme.Navy;
 
+    /// <summary>The look of a button that cannot be pressed now: Color.Empty = its normal fill, with pale text.</summary>
+    internal Color DisabledFill = Color.Empty;
+    internal Color DisabledText = Theme.PaleBlue;
+
+    /// <summary>The corner radius in pixels at 100% (the navy buttons of the Maestro skin are almost square).</summary>
+    internal int Radius = FluentDrawing.CornerRadius;
+
     public RoundedButton()
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
@@ -116,13 +123,13 @@ internal class RoundedButton : Button
         Color border = BorderColor;
         if (!Enabled)
         {
-            // A button that cannot be pressed now (e.g. "previous" at the first label): pale text and border.
-            fill = NormalFill;
-            text = Theme.PaleBlue;
+            // A button that cannot be pressed now (e.g. Browse of the csv next to a label-xml): pale text and border.
+            fill = DisabledFill == Color.Empty ? NormalFill : DisabledFill;
+            text = DisabledText;
             border = border == Color.Empty ? border : Theme.PaleBlue;
         }
 
-        float radius = LogicalToDeviceUnits(FluentDrawing.CornerRadius);
+        float radius = LogicalToDeviceUnits(Radius);
         var outline = new RectangleF(0.5f, 0.5f, Width - 1, Height - 1); // half a pixel in: the border stays inside
 
         using (GraphicsPath path = FluentDrawing.RoundedRectangle(outline, radius))
@@ -137,9 +144,13 @@ internal class RoundedButton : Button
             }
         }
 
-        if (Image != null)
+        if (Image != null && Text == "")
         {
             DrawIcon(g);
+        }
+        else if (Image != null)
+        {
+            DrawIconAndText(g, text);
         }
         else
         {
@@ -186,18 +197,62 @@ internal class RoundedButton : Button
         pale.SetColorMatrix(new System.Drawing.Imaging.ColorMatrix { Matrix33 = 0.3f }); // 30% opaque
         g.DrawImage(Image, Rectangle.Round(place), 0, 0, Image.Width, Image.Height, GraphicsUnit.Pixel, pale);
     }
+
+    /// <summary>The room between the picture and the text of a button that has both (Browse: a folder + "Browse…"), at 100%.</summary>
+    internal const int IconTextGap = 8;
+
+    /// <summary>
+    /// A picture AND a text (the Browse buttons of 2.0.0: a folder before "Browse…"): the two together in the middle of the
+    /// button, the picture <see cref="IconHeight"/> high.
+    /// </summary>
+    private void DrawIconAndText(Graphics g, Color textColor)
+    {
+        const TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
+        float height = LogicalToDeviceUnits(IconHeight);
+        float width = height * Image!.Width / Image.Height;
+        int gap = LogicalToDeviceUnits(IconTextGap);
+        Size textSize = TextRenderer.MeasureText(g, Text, Font, new Size(int.MaxValue, int.MaxValue), flags);
+        float left = Math.Max(0, (Width - (width + gap + textSize.Width)) / 2f);
+
+        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        var place = new RectangleF(left, (Height - height) / 2, width, height);
+        if (Enabled)
+        {
+            g.DrawImage(Image, place);
+        }
+        else
+        {
+            using var pale = new System.Drawing.Imaging.ImageAttributes();
+            pale.SetColorMatrix(new System.Drawing.Imaging.ColorMatrix { Matrix33 = 0.4f });
+            g.DrawImage(Image, Rectangle.Round(place), 0, 0, Image.Width, Image.Height, GraphicsUnit.Pixel, pale);
+        }
+
+        g.PixelOffsetMode = PixelOffsetMode.Default;
+        var textArea = new Rectangle((int)(left + width + gap), 0, Math.Max(0, Width - (int)(left + width + gap)), Height);
+        TextRenderer.DrawText(g, Text, Font, textArea, textColor, flags | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+    }
+
+    /// <summary>The width a button with a picture and a text needs at least (both, the gap, and room on both sides), in pixels.</summary>
+    internal int WidthNeededForIconAndText()
+    {
+        float height = LogicalToDeviceUnits(IconHeight);
+        float width = Image == null ? 0 : height * Image.Width / Image.Height;
+        int text = TextRenderer.MeasureText(Text, Font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Width;
+        return (int)Math.Ceiling(width) + LogicalToDeviceUnits(IconTextGap) + text + LogicalToDeviceUnits(2 * 14);
+    }
 }
 
 /// <summary>
-/// The vertical line between the two columns, as a handle that can be dragged with the mouse (Daan, 2026-10-25: "make it
-/// possible to move the vertical divider"). The control is as wide as the room around the line (20 px on each side at
-/// 100%), so it is easy to grab; only the thin line in the middle is drawn, a little thicker and darker while the mouse is
-/// on it. The window decides what dragging does: it gets the mouse position and sets the column widths.
+/// The handle between the two columns that can be dragged with the mouse (Daan, 2026-10-25: "make it possible to move the
+/// vertical divider"). Since 2.0.0 (the Maestro skin) it is the grey gap between the two white panels: at rest nothing is
+/// drawn on it, under the mouse a light-blue line shows that it can be moved. The window decides what dragging does: it
+/// gets the mouse position and sets the column widths.
 /// </summary>
 internal class ColumnSplitter : Control
 {
-    /// <summary>The width of the handle at 100%: 20 px room + the 1 px line + 20 px room.</summary>
-    public const int HandleWidth = 41;
+    /// <summary>The width of the handle at 100%: the grey gap between the two panels.</summary>
+    public const int HandleWidth = 14;
 
     private bool _hover;
     private bool _dragging;
@@ -281,12 +336,13 @@ internal class ColumnSplitter : Control
         Graphics g = e.Graphics;
         g.Clear(FluentDrawing.BehindColor(this));
 
-        // At rest the same thin pale-blue line as the horizontal dividers; under the mouse thicker and darker, so it is
-        // clear that it can be moved.
-        bool active = _hover || _dragging;
-        int thickness = active ? LogicalToDeviceUnits(3) : 1;
-        using var line = new SolidBrush(active ? Theme.LightBlue : Theme.PaleBlue);
-        g.FillRectangle(line, (Width - thickness) / 2, 0, thickness, Height);
+        // At rest only the grey gap; under the mouse a light-blue line, so it is clear that it can be moved.
+        if (_hover || _dragging)
+        {
+            int thickness = LogicalToDeviceUnits(4);
+            using var line = new SolidBrush(Theme.Selection);
+            g.FillRectangle(line, (Width - thickness) / 2, 0, thickness, Height);
+        }
     }
 }
 
@@ -417,6 +473,15 @@ internal abstract class RoundedFrame : Panel
     /// <summary>The colour inside the border: white, or the background of the control inside (the grey editor).</summary>
     internal Color FillColor = Theme.White;
 
+    /// <summary>The border; Color.Empty = none (the flat fields of the Maestro skin, <see cref="Theme.StyleField"/>).</summary>
+    internal Color BorderColor = Theme.LightBlue;
+
+    /// <summary>The corner radius in pixels at 100%; 0 = square.</summary>
+    internal int Radius = FluentDrawing.CornerRadius;
+
+    /// <summary>The line at the bottom while the control inside has the focus.</summary>
+    internal Color FocusColor = Theme.DarkBlue;
+
     protected RoundedFrame(Control content)
     {
         Content = content;
@@ -436,14 +501,40 @@ internal abstract class RoundedFrame : Panel
         g.Clear(FluentDrawing.BehindColor(this));
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        float radius = LogicalToDeviceUnits(FluentDrawing.CornerRadius);
+        if (Radius == 0)
+        {
+            // Flat and square (the Maestro skin): no smoothing, so the edges stay crisp.
+            g.SmoothingMode = SmoothingMode.None;
+            using var flat = new SolidBrush(FillColor);
+            g.FillRectangle(flat, ClientRectangle);
+            if (BorderColor != Color.Empty)
+            {
+                using var flatPen = new Pen(BorderColor, 1);
+                g.DrawRectangle(flatPen, 0, 0, Width - 1, Height - 1);
+            }
+
+            if (_focused)
+            {
+                int thick = LogicalToDeviceUnits(2);
+                using var accentBrush = new SolidBrush(FocusColor);
+                g.FillRectangle(accentBrush, 0, Height - thick, Width, thick);
+            }
+
+            return;
+        }
+
+        float radius = LogicalToDeviceUnits(Radius);
         var outline = new RectangleF(0.5f, 0.5f, Width - 1, Height - 1);
 
         using GraphicsPath path = FluentDrawing.RoundedRectangle(outline, radius);
         using (var brush = new SolidBrush(FillColor))
-        using (var pen = new Pen(Theme.LightBlue, 1))
         {
             g.FillPath(brush, path);
+        }
+
+        if (BorderColor != Color.Empty)
+        {
+            using var pen = new Pen(BorderColor, 1);
             g.DrawPath(pen, path);
         }
 
@@ -452,7 +543,7 @@ internal abstract class RoundedFrame : Panel
             // Only the bottom strip of the border is drawn again, thicker and darker.
             float line = LogicalToDeviceUnits(2);
             g.SetClip(new RectangleF(0, Height - line, Width, line));
-            using var accent = new Pen(Theme.DarkBlue, line);
+            using var accent = new Pen(FocusColor, line);
             g.DrawPath(accent, path);
             g.ResetClip();
         }
@@ -484,7 +575,8 @@ internal class TextBoxFrame : RoundedFrame
 /// <summary>A big control (the XML editor, the csv table) in a rounded frame: it fills the frame, just inside the border.</summary>
 internal class ContentFrame : RoundedFrame
 {
-    private const int Inset = 3; // inside the rounded corners, at 100%
+    /// <summary>The room between the frame and the control inside, at 100% (inside the rounded corners; 0 for a flat frame).</summary>
+    internal int Inset = 3;
 
     public ContentFrame(Control content)
         : base(content)

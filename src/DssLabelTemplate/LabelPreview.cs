@@ -5,15 +5,19 @@ namespace DssLabelTemplate;
 
 /// <summary>
 /// The right column: the preview of ONE label (<see cref="Index"/>) of the <see cref="LabelSet"/>, as it would be printed,
-/// with below it where it sits (ID, X, Y, rotation) and a small map of the sheet with all its labels.
-/// Top to bottom: the label (as big as fits), an info line, a line for problems, the sheet map.
+/// on the grey work area of the Maestro skin (2.0.0), with a small map of the sheet with all its labels: LEFT of the label
+/// when the preview is wider than high (Daan's mockup, 2026-11-21), below it otherwise. At the bottom a line for problems
+/// (in a white box, so the red stays readable on the grey). Where the label sits (ID, X, Y, rotation, sheet) is no longer
+/// written here: the window shows it in the two tiles below the preview.
 /// </summary>
 internal class LabelPreview : Control
 {
     private const int Margin16 = 16;   // room around everything, at 100%
     private const int Gap = 8;         // between the parts, at 100%
-    // The sheet map, with the room above and below it, gets this part of the height; the label with its two lines the
-    // rest: 60 % / 40 % (Daan, 2026-10-26; was about 70 / 30).
+    private const int BoxPadding = 6;  // inside the white box of a message, at 100%
+    private const int ShadowOffset = 3; // the grey shadow below the label and the sheet, at 100%
+    // The sheet map gets this part of the room: 40 % of the height when it is below the label (Daan, 2026-10-26; was
+    // about 30 %), 40 % of the width when it is beside it (2.0.0).
     private const float SheetMapShare = 0.40f;
     private const int OriginDot = 9;   // the round zero-point dot on the sheet map, at 100%
     private const int OriginRing = 2;  // white ring around that dot, at 100%
@@ -172,7 +176,7 @@ internal class LabelPreview : Control
 
         if (_labels == null)
         {
-            DrawMessage(g, inside, Strings.PreviewNoFile, Theme.Navy);
+            DrawMessage(g, inside, Strings.PreviewNoFile, Theme.Text);
         }
         else if (_labels.Error != null)
         {
@@ -180,7 +184,7 @@ internal class LabelPreview : Control
         }
         else if (Count == 0)
         {
-            DrawMessage(g, inside, _labels.Message ?? Strings.PreviewEmptyLabelFile, Theme.Navy);
+            DrawMessage(g, inside, _labels.Message ?? Strings.PreviewEmptyLabelFile, Theme.Text);
         }
         else
         {
@@ -189,23 +193,13 @@ internal class LabelPreview : Control
     }
 
     /// <summary>
-    /// The background of the preview and of the board (<see cref="SheetBoard"/>): the same rounded frame as the editor,
-    /// on the very pale blue of the panels. Returns the room inside it, within the margin.
+    /// The background of the preview and of the board (<see cref="SheetBoard"/>): the grey work area of the Maestro skin
+    /// (2.0.0, like Maestro's "Charger un programme" area). Returns the room inside it, within the margin.
     /// </summary>
     internal static Rectangle DrawPanel(Graphics g, Control control)
     {
-        g.Clear(FluentDrawing.BehindColor(control));
+        g.Clear(Theme.WorkArea);
         g.SmoothingMode = SmoothingMode.AntiAlias;
-
-        float radius = control.LogicalToDeviceUnits(FluentDrawing.CornerRadius);
-        using (GraphicsPath frame = FluentDrawing.RoundedRectangle(new RectangleF(0.5f, 0.5f, control.Width - 1, control.Height - 1), radius))
-        using (var fill = new SolidBrush(Theme.VeryPaleBlue))
-        using (var pen = new Pen(Theme.LightBlue, 1))
-        {
-            g.FillPath(fill, frame);
-            g.DrawPath(pen, frame);
-        }
-
         return PanelInside(control);
     }
 
@@ -220,16 +214,43 @@ internal class LabelPreview : Control
     internal bool ShownLabelHasSheet =>
         Count > 0 && _labels!.Error == null && _labels.Labels[_index] is { SheetLength: > 0, SheetWidth: > 0 };
 
+    /// <summary>
+    /// Where the label and the sheet map go in <paramref name="content"/>: the map left of the label (40 % of the width)
+    /// when the room is wider than high, otherwise below it (40 % of the preview's height); no map = all for the label.
+    /// </summary>
+    internal (Rectangle Label, Rectangle Map) SplitLabelAndMap(Rectangle content, bool drawMap)
+    {
+        if (!drawMap)
+        {
+            return (content, Rectangle.Empty);
+        }
+
+        int gap = LogicalToDeviceUnits(Gap);
+        if (content.Width >= content.Height)
+        {
+            int between = 3 * gap;
+            int mapWidth = (int)((content.Width - between) * SheetMapShare);
+            var map = new Rectangle(content.Left, content.Top, mapWidth, content.Height);
+            return (new Rectangle(map.Right + between, content.Top, content.Width - mapWidth - between, content.Height), map);
+        }
+
+        int mapHeight = MapHeight(Height, gap, LogicalToDeviceUnits(Margin16));
+        var label = new Rectangle(content.Left, content.Top, content.Width, content.Height - mapHeight - gap);
+        return (label, new Rectangle(content.Left, label.Bottom + gap, content.Width, mapHeight));
+    }
+
     private void DrawLabelAndSheet(Graphics g, Rectangle inside)
     {
         LabelItem label = _labels!.Labels[_index];
         int gap = LogicalToDeviceUnits(Gap);
-        int line = Font.Height;
         bool hasSheet = label.SheetLength > 0 && label.SheetWidth > 0;
         bool drawMap = hasSheet && _showSheetMap; // not while the board shows the same map big: the label gets its room
-        int mapHeight = drawMap ? MapHeight(Height, gap, LogicalToDeviceUnits(Margin16)) : 0;
-        int labelHeight = inside.Height - 2 * line - gap - (drawMap ? mapHeight + gap : 0);
-        if (labelHeight <= 0)
+
+        // A problem is written in a white box at the bottom, ON the work area (over the label if the room is small): no room
+        // is kept free for it, so a small window still shows the label as big as it can.
+        int problemHeight = Font.Height + 2 * LogicalToDeviceUnits(BoxPadding);
+        var (labelArea, mapArea) = SplitLabelAndMap(inside, drawMap);
+        if (labelArea.Width <= 0 || labelArea.Height <= 0)
         {
             return; // the window is too small to show anything sensible
         }
@@ -246,55 +267,56 @@ internal class LabelPreview : Control
         int turns = _showRotation ? LabelRenderer.QuarterTurnsAsTheOperatorSees(label.Rotation, _sheetRotation, _rotationClockwise) : 0;
         float viewAcross = turns % 2 == 0 ? view.Width : view.Height;
         float viewUpDown = turns % 2 == 0 ? view.Height : view.Width;
-        float scale = Math.Min(inside.Width / viewAcross, labelHeight / viewUpDown);
+        int shadow = LogicalToDeviceUnits(ShadowOffset);
+        float scale = Math.Min((labelArea.Width - shadow) / viewAcross, (labelArea.Height - shadow) / viewUpDown);
 
         GraphicsState state = g.Save();
-        g.TranslateTransform(inside.Left + inside.Width / 2f, inside.Top + labelHeight / 2f); // the middle of the room
+        g.TranslateTransform(labelArea.Left + labelArea.Width / 2f, labelArea.Top + labelArea.Height / 2f); // the middle of the room
         g.RotateTransform(-90 * turns); // on the screen Y counts downwards: a negative angle turns counter-clockwise
         g.ScaleTransform(scale, scale); // from here on, one unit is one millimetre on the label
         g.TranslateTransform(-(view.X + view.Width / 2), -(view.Y + view.Height / 2)); // the middle of the view there
 
-        using (var white = new SolidBrush(Theme.LabelPaper))
-        using (var border = new Pen(Theme.LightBlue, 1 / scale)) // one screen pixel wide
+        // The paper with a grey shadow below it (it lies on the grey work area). The shadow goes DOWN ON THE SCREEN, also
+        // when the label is turned: the screen's "down" turned back by the label's turn, in mm.
+        PointF[] down = { new(0, shadow / scale) };
+        using (var back = new Matrix())
         {
+            back.Rotate(90 * turns);
+            back.TransformVectors(down);
+        }
+
+        using (var shade = new SolidBrush(Theme.Shadow))
+        using (var white = new SolidBrush(Theme.LabelPaper))
+        {
+            g.FillRectangle(shade, down[0].X, down[0].Y, size.Width, size.Height);
             g.FillRectangle(white, 0, 0, size.Width, size.Height);
-            g.DrawRectangle(border, 0, 0, size.Width, size.Height);
         }
 
         g.TextRenderingHint = TextRenderingHint.AntiAlias;
         LabelRenderer.Draw(g, label, _baseFolder, _images, Problems);
         g.Restore(state);
 
-        // 2. Where the label sits on the sheet, and 3. what could not be drawn.
-        int top = inside.Top + labelHeight + gap;
-        string info = Strings.LabelInfo(label.Id, NumberText(label.X), NumberText(label.Y), label.Rotation.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        if (hasSheet)
+        // 2. The sheet with all its labels.
+        if (drawMap)
         {
-            info += "  ·  " + Strings.SheetInfo(LabelXml.Format(label.SheetLength!.Value), LabelXml.Format(label.SheetWidth!.Value));
+            DrawSheetMap(g, this, mapArea, _labels.Labels, _index, size, _sheetRotation, _referenceCorner);
         }
 
-        DrawLine(g, new Rectangle(inside.Left, top, inside.Width, line), info, Theme.Navy);
-        var problemLine = new Rectangle(inside.Left, top + line, inside.Width, line);
+        // 3. What could not be drawn, in a white box at the bottom.
+        var problemLine = new Rectangle(inside.Left, inside.Bottom - problemHeight, inside.Width, problemHeight);
         if (label.MissingVariables.Count > 0)
         {
             // First: it is usually the cause of the other problems (a "?" above, an object that cannot be drawn).
             string names = string.Join(", ", label.MissingVariables.Select(name => "$" + name + "$"));
-            DrawLine(g, problemLine, Strings.VariablesNotInCsv(names), Theme.Error);
+            DrawLineInBox(g, problemLine, Strings.VariablesNotInCsv(names), Theme.Error);
         }
         else if (Problems.Count > 0)
         {
-            DrawLine(g, problemLine, Strings.ObjectsNotDrawn(Problems.Count, Problems[0]), Theme.Error);
+            DrawLineInBox(g, problemLine, Strings.ObjectsNotDrawn(Problems.Count, Problems[0]), Theme.Error);
         }
         else if (ObjectsOutside > 0)
         {
-            DrawLine(g, problemLine, Strings.ObjectsOutsideLabel(ObjectsOutside), Theme.Error);
-        }
-
-        // 4. The sheet with all its labels.
-        if (drawMap)
-        {
-            DrawSheetMap(g, this, new Rectangle(inside.Left, top + 2 * line + gap, inside.Width, mapHeight),
-                _labels.Labels, _index, size, _sheetRotation, _referenceCorner);
+            DrawLineInBox(g, problemLine, Strings.ObjectsOutsideLabel(ObjectsOutside), Theme.Error);
         }
     }
 
@@ -321,17 +343,20 @@ internal class LabelPreview : Control
         RectangleF sheet = RectangleF.FromLTRB(Math.Min(corner1.X, corner2.X), Math.Min(corner1.Y, corner2.Y),
             Math.Max(corner1.X, corner2.X), Math.Max(corner1.Y, corner2.Y));
 
+        // The sheet: white on the grey work area, with a grey shadow below it (Maestro skin, 2.0.0).
+        float shadow = control.LogicalToDeviceUnits(ShadowOffset);
+        using (var shade = new SolidBrush(Theme.Shadow))
         using (var white = new SolidBrush(Theme.White))
-        using (var border = new Pen(Theme.LightBlue, 1))
         {
+            g.FillRectangle(shade, sheet.X, sheet.Y + shadow, sheet.Width, sheet.Height);
             g.FillRectangle(white, sheet);
-            g.DrawRectangle(border, sheet.X, sheet.Y, sheet.Width, sheet.Height);
         }
 
-        // The other labels first, the shown one last (on top, with an outline).
-        using var others = new SolidBrush(Theme.PaleBlue);
-        using var current = new SolidBrush(Theme.Brand);
-        using var outline = new Pen(Theme.Navy, 1);
+        // The other labels first in light blue, the shown one last in navy with a light-blue ring (on top).
+        using var others = new SolidBrush(Theme.OtherLabel);
+        using var current = new SolidBrush(Theme.ButtonNavy);
+        float ringWidth = control.LogicalToDeviceUnits(3);
+        using var shownRing = new Pen(Theme.Selection, ringWidth);
         List<(int Index, RectangleF Square)> squares = LabelSquares(control, area, labels, labelSize, sheetRotation, referenceCorner, length, width);
 
         foreach (var (index, square) in squares.Where(item => item.Index != shownIndex))
@@ -341,8 +366,9 @@ internal class LabelPreview : Control
 
         foreach (var (_, square) in squares.Where(item => item.Index == shownIndex))
         {
+            RectangleF around = RectangleF.Inflate(square, ringWidth / 2, ringWidth / 2);
+            g.DrawRectangle(shownRing, around.X, around.Y, around.Width, around.Height);
             g.FillRectangle(current, square);
-            g.DrawRectangle(outline, square.X, square.Y, square.Width, square.Height);
         }
 
         // A round dot on the zero point (X 0, Y 0): the corner the label X / Y are measured from. Drawn last, so a label in
@@ -482,20 +508,43 @@ internal class LabelPreview : Control
         return new PointF(middleX + dx * scale, middleY - dy * scale); // on the screen Y counts downwards
     }
 
+    /// <summary>
+    /// A message in the middle of the preview ("choose a file", an xml error), in a white box: the red of an error is not
+    /// readable on the grey work area, and the box makes every message look the same.
+    /// </summary>
     private void DrawMessage(Graphics g, Rectangle area, string text, Color color)
     {
-        TextRenderer.DrawText(g, text, Font, area, color,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
+        const TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix;
+        int padding = 2 * LogicalToDeviceUnits(BoxPadding);
+        int width = Math.Max(1, area.Width - 2 * padding);
+        Size textSize = TextRenderer.MeasureText(g, text, Font, new Size(width, int.MaxValue), flags);
+        var box = new Rectangle(area.Left + (area.Width - textSize.Width) / 2 - padding, area.Top + (area.Height - textSize.Height) / 2 - padding,
+            textSize.Width + 2 * padding, textSize.Height + 2 * padding);
+
+        using (var white = new SolidBrush(Theme.White))
+        {
+            g.FillRectangle(white, box);
+        }
+
+        TextRenderer.DrawText(g, text, Font, Rectangle.Inflate(box, -padding, -padding), color, flags);
     }
 
-    private void DrawLine(Graphics g, Rectangle area, string text, Color color)
+    /// <summary>One line (a problem with the shown label) in a white box, in the middle of <paramref name="area"/>'s width.</summary>
+    private void DrawLineInBox(Graphics g, Rectangle area, string text, Color color)
     {
-        TextRenderer.DrawText(g, text, Font, area, color,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
-            TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-    }
+        const TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix |
+                                      TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter;
+        int padding = LogicalToDeviceUnits(BoxPadding);
+        int width = Math.Min(area.Width, TextRenderer.MeasureText(g, text, Font).Width + 4 * padding);
+        var box = new Rectangle(area.Left + (area.Width - width) / 2, area.Top, width, area.Height);
 
-    private static string NumberText(double? value) => value is double number ? LabelXml.Format(number) : "?";
+        using (var white = new SolidBrush(Theme.White))
+        {
+            g.FillRectangle(white, box);
+        }
+
+        TextRenderer.DrawText(g, text, Font, box, color, flags);
+    }
 
     protected override void Dispose(bool disposing)
     {

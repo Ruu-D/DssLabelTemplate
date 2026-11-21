@@ -65,7 +65,7 @@ public class SettingsTests
     private static readonly string[] WindowSettings =
     {
         "Language", "LastFile", "LastCsvFile", "LabelLength", "LabelWidth", "PrinterName", "EditorColumnShare", "CsvColumnOrder",
-        "WindowLeft", "WindowTop", "WindowWidth", "WindowHeight", "WindowMaximized",
+        "WindowLeft", "WindowTop", "WindowWidth", "WindowHeight", "WindowMaximized", "XmlFileLineFolded", "CsvFileLineFolded",
     };
 
     [Fact]

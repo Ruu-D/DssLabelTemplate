@@ -10,7 +10,7 @@ The main application, **DssLabelTemplate.exe**, can be used to:
 
 There are several hidden parameters available in the **settings.json** file:
 
-- **Shift + click on the ROGIERS logo** (bottom left of the window) opens settings.json in Notepad. A normal click opens the website.
+- **Shift + click on the ROGIERS logo** (top right of the window, next to the round "?") opens settings.json in Notepad. A normal click opens the website.
 - Save the file in Notepad, then click back into the DssLabelTemplate window: the new values are used at once, no restart needed.
 - The program never overwrites your changes when it saves its own settings (window position, language, ...).
 - If the file contains a mistake, a message tells you so: the previous settings stay in use and the file is not overwritten until it is fixed.
