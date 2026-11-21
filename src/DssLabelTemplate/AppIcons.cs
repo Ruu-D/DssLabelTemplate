@@ -21,14 +21,19 @@ internal static class AppIcons
     }
 
     /// <summary>
-    /// The banner: the logo (<see cref="AppLogo"/>) on the brand colour, with the name of the program and one line below
-    /// it. The text is in English in every language (like TsDssConverter's banner).
+    /// The banner (only for the README since 2.0.0): the logo (<see cref="AppLogo"/>) on the blue of the Maestro skin's
+    /// bottom bar (Daan, 2026-11-21; it was the brand colour), with the name of the program and one line below it, in
+    /// white like the counter on that bar. The text is in English in every language (like TsDssConverter's banner).
     /// </summary>
     public static Image Banner()
     {
         var banner = new Bitmap(BannerPictureWidth, BannerPictureHeight);
         using var graphics = Graphics.FromImage(banner);
-        graphics.Clear(Theme.Brand);
+        var all = new Rectangle(0, 0, BannerPictureWidth, BannerPictureHeight);
+        using (var bar = new LinearGradientBrush(all, Theme.BarTop, Theme.BarBottom, LinearGradientMode.Vertical))
+        {
+            graphics.FillRectangle(bar, all);
+        }
         graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
 
         AppLogo.Draw(graphics, BannerLogo, withBackground: false);
@@ -36,9 +41,9 @@ internal static class AppIcons
         // The same places as the text of TsDssConverter's banner: the title's baseline at y = 82, the subtitle's at y = 128.
         using var titleFont = Theme.CreateBannerTitleFont(54);
         using var subtitleFont = Theme.CreateBannerSubtitleFont(27);
-        using var navy = new SolidBrush(Theme.Navy);
-        DrawOnBaseline(graphics, Strings.AppName, titleFont, navy, BannerTextLeft, 82);
-        DrawOnBaseline(graphics, Strings.BannerSubtitle, subtitleFont, navy, BannerTextLeft + 2, 128);
+        using var white = new SolidBrush(Theme.White);
+        DrawOnBaseline(graphics, Strings.AppName, titleFont, white, BannerTextLeft, 82);
+        DrawOnBaseline(graphics, Strings.BannerSubtitle, subtitleFont, white, BannerTextLeft + 2, 128);
         return banner;
     }
 

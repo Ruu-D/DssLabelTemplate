@@ -52,12 +52,24 @@ public class AppLogoTests
     }
 
     [Fact]
-    public void TheBanner_HasTheLogoAndIsDrawnOnTheBrandColour()
+    public void TheBanner_HasTheLogoAndIsDrawnOnTheBlueOfTheBottomBar()
     {
         using Image banner = AppIcons.Banner();
         using var picture = new Bitmap(banner);
 
-        Assert.Equal(Theme.Brand.ToArgb(), picture.GetPixel(picture.Width - 2, 2).ToArgb()); // plain brand blue on the right
-        Assert.Equal(Theme.White.ToArgb(), picture.GetPixel(60, 40).ToArgb());               // the white label of the logo
+        // On the right (no text there) the bar's gradient: its top colour at the top, its bottom colour at the bottom.
+        AssertAbout(Theme.BarTop, picture.GetPixel(picture.Width - 2, 0));
+        AssertAbout(Theme.BarBottom, picture.GetPixel(picture.Width - 2, picture.Height - 1));
+        Assert.Equal(Theme.White.ToArgb(), picture.GetPixel(60, 40).ToArgb()); // the white label of the logo
+    }
+
+    /// <summary>A gradient's first and last pixel are not always exactly its colours: a few steps off is the same colour.</summary>
+    private static void AssertAbout(Color expected, Color actual)
+    {
+        const int tolerance = 4;
+        Assert.True(Math.Abs(expected.R - actual.R) <= tolerance
+                    && Math.Abs(expected.G - actual.G) <= tolerance
+                    && Math.Abs(expected.B - actual.B) <= tolerance,
+            $"expected about {ColorTranslator.ToHtml(expected)}, got {ColorTranslator.ToHtml(actual)}");
     }
 }

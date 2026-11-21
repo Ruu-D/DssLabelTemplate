@@ -1,5 +1,13 @@
 # Changelog
 
+## README banner in the Maestro blues — 2026-11-21 (Daan, no new version)
+
+- `media/header.png` (the README header) is now drawn on the vertical gradient of the bottom bar (`Theme.BarTop` →
+  `Theme.BarBottom`) with white text, instead of navy on the brand blue. Same size, logo, fonts and places. Changed in
+  `AppIcons.Banner` and written with `--write-icon media` (the icon files came out unchanged). The same change was made to
+  TsDssConverter's README banner. The exe is not affected (the window has no banner since 2.0.0), so no new build.
+- Test `TheBanner_HasTheLogoAndIsDrawnOnTheBlueOfTheBottomBar` (was `…OnTheBrandColour`). 244 tests.
+
 ## 2.0.0 — 2026-11-21 — FIRST CUSTOMER RELEASE in the "Maestro" skin (Daan)
 
 - **Delivery:** `dist\v2.0.0\DssLabelTemplate.exe`, 54,576,664 bytes, file version 2.0.0.0, SHA-256
