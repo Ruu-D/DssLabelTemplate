@@ -417,13 +417,14 @@ internal class FluentCheckBox : CheckBox
         float top = (Height - box) / 2f;
         var outline = new RectangleF(0.5f, top + 0.5f, box - 1, box - 1);
 
-        // Unchecked: a white box with a blue border. Checked: filled with the brand colour (dark blue under the mouse).
-        Color fill = Checked ? (_hover ? Theme.DarkBlue : Theme.Brand) : (_hover ? Theme.VeryPaleBlue : Theme.White);
-        Color border = Checked ? fill : Theme.DarkBlue;
+        // The Maestro look (2.0.1, the check boxes of the Magic parameters, the same as TsDssConverter's): unchecked a white
+        // box with a navy border, checked navy with a white tick (a lighter navy under the mouse).
+        Color fill = Checked ? (_hover ? Theme.ButtonNavyHover : Theme.ButtonNavy) : (_hover ? Theme.Field : Theme.White);
+        Color border = Checked ? fill : Theme.ButtonNavy;
 
         using (GraphicsPath path = FluentDrawing.RoundedRectangle(outline, radius))
         using (var brush = new SolidBrush(fill))
-        using (var pen = new Pen(border, 1))
+        using (var pen = new Pen(border, Math.Max(1, LogicalToDeviceUnits(1))))
         {
             g.FillPath(brush, path);
             g.DrawPath(pen, path);
@@ -431,8 +432,8 @@ internal class FluentCheckBox : CheckBox
 
         if (Checked)
         {
-            // The tick, as three points inside the box. Navy on the brand colour, white on dark blue (readable both ways).
-            using var tickPen = new Pen(_hover ? Theme.White : Theme.Navy, Math.Max(1.5f, box / 9f))
+            // The tick, as three points inside the box, white on navy.
+            using var tickPen = new Pen(Theme.White, Math.Max(1.5f, box / 8f))
             {
                 StartCap = LineCap.Round,
                 EndCap = LineCap.Round,
@@ -550,7 +551,10 @@ internal abstract class RoundedFrame : Panel
     }
 }
 
-/// <summary>A one-line TextBox in a rounded frame: in the middle of the frame's height, filling its width.</summary>
+/// <summary>
+/// A one-line TextBox in a rounded frame: in the middle of the frame's height, filling its width. Since 2.0.1 also a
+/// NumericUpDown (the number box of the Magic parameters).
+/// </summary>
 internal class TextBoxFrame : RoundedFrame
 {
     private const int SidePadding = 8; // between the border and the text, at 100%
@@ -562,12 +566,19 @@ internal class TextBoxFrame : RoundedFrame
         box.BackColor = Theme.White;
     }
 
+    public TextBoxFrame(NumericUpDown box)
+        : base(box)
+    {
+        box.BorderStyle = BorderStyle.None;
+        box.BackColor = Theme.White;
+    }
+
     protected override void OnLayout(LayoutEventArgs levent)
     {
         base.OnLayout(levent);
 
         int side = LogicalToDeviceUnits(SidePadding);
-        int height = ((TextBox)Content).PreferredHeight;
+        int height = Content is TextBox textBox ? textBox.PreferredHeight : ((UpDownBase)Content).PreferredHeight;
         Content.SetBounds(side, (Height - height) / 2, Math.Max(0, Width - 2 * side), height);
     }
 }

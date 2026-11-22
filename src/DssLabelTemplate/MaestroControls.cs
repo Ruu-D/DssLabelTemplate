@@ -38,6 +38,47 @@ internal static class MaestroDrawing
         return path;
     }
 
+    /// <summary>
+    /// A cog wheel (the Magic parameters, 2.0.1, the same as TsDssConverter's): eight flat teeth around a wheel, with a
+    /// round hole in the middle in <paramref name="hole"/> (the colour behind the cog).
+    /// </summary>
+    public static void DrawCog(Graphics g, RectangleF box, Color ink, Color hole)
+    {
+        float centreX = box.Left + box.Width / 2;
+        float centreY = box.Top + box.Height / 2;
+        float outer = Math.Min(box.Width, box.Height) / 2;
+        float inner = outer * 0.74f;
+
+        // Every tooth: from the wheel up to the tip and down again, a little narrower at the tip than at its foot.
+        var points = new List<PointF>();
+        for (int tooth = 0; tooth < 8; tooth++)
+        {
+            double middle = tooth * Math.PI / 4;
+            foreach (var (turn, radius) in new[] { (-0.30, inner), (-0.17, outer), (0.17, outer), (0.30, inner) })
+            {
+                points.Add(new PointF(centreX + radius * (float)Math.Cos(middle + turn), centreY + radius * (float)Math.Sin(middle + turn)));
+            }
+        }
+
+        using (var brush = new SolidBrush(ink))
+        {
+            g.FillPolygon(brush, points.ToArray());
+        }
+
+        float hollow = outer * 0.36f;
+        using var holeBrush = new SolidBrush(hole);
+        g.FillEllipse(holeBrush, centreX - hollow, centreY - hollow, 2 * hollow, 2 * hollow);
+    }
+
+    /// <summary>The tick of Save (on a grid of 24 in <paramref name="box"/>): from the left, down, then up to the right.</summary>
+    public static void DrawTick(Graphics g, RectangleF box, Color colour)
+    {
+        float unit = box.Width / 24;
+        PointF P(float x, float y) => new(box.Left + x * unit, box.Top + y * unit);
+        using var pen = new Pen(colour, 2.8f * unit) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+        g.DrawLines(pen, new[] { P(5, 12.5f), P(9.5f, 17), P(19, 7.5f) });
+    }
+
     /// <summary>A soft shadow below a shape: the same shape a little lower, in see-through black.</summary>
     public static void FillShadow(Graphics g, GraphicsPath shape, float down, int alpha)
     {
@@ -200,6 +241,7 @@ internal enum DiscGlyph
     Next,     // a triangle pointing right
     Question, // a "?" (the user guide)
     Board,    // a sheet with a few parts on it (the board view), drawn like the mockup's icon
+    Cog,      // a cog wheel (the Magic parameters, 2.0.1; only on a Flat disc)
 }
 
 /// <summary>
@@ -268,6 +310,14 @@ internal class DiscButton : ShapedButton
             using (var grey = new SolidBrush(Pressed ? Theme.WindowButtonPressed : Hover ? Theme.WindowButtonHover : Theme.WindowButton))
             {
                 g.FillEllipse(grey, round);
+            }
+
+            if (Glyph == DiscGlyph.Cog)
+            {
+                // The cog of the Magic parameters, right of the "?": the same flat disc, the cog in the bar's grey.
+                MaestroDrawing.DrawCog(g, RectangleF.Inflate(round, -flat * 0.19f, -flat * 0.19f), Theme.TopBar,
+                    Pressed ? Theme.WindowButtonPressed : Hover ? Theme.WindowButtonHover : Theme.WindowButton);
+                return;
             }
 
             using var signFont = new Font(Font.FontFamily, Font.SizeInPoints, FontStyle.Bold, GraphicsUnit.Point);
@@ -811,9 +861,18 @@ internal class TabButton : Button
     }
 }
 
+/// <summary>What a <see cref="PillButton"/> shows in its navy circle.</summary>
+internal enum PillSign
+{
+    Printer, // the print button
+    Tick,    // Save of the Magic parameters (2.0.1)
+    None,    // Cancel of the Magic parameters: no circle, the text in the middle, not bold
+}
+
 /// <summary>
 /// The print button at the bottom right, like Maestro's "MDI" / "Manual" buttons: a light-grey pill with a navy circle
 /// holding the white printer of the mockup (<see cref="MaestroDrawing.DrawPrinterIcon"/>), and the bold text "Print".
+/// Since 2.0.1 also Save (<see cref="PillSign.Tick"/>) and Cancel (<see cref="PillSign.None"/>) of the Magic parameters.
 /// </summary>
 internal class PillButton : ShapedButton
 {
@@ -824,11 +883,20 @@ internal class PillButton : ShapedButton
     /// <summary>The size of the printer in the circle, in pixels at 100%.</summary>
     internal int IconHeight = 24;
 
+    /// <summary>The sign in the navy circle (the printer for the print button).</summary>
+    internal PillSign Sign = PillSign.Printer;
+
     private Font BoldFont => new(Font, FontStyle.Bold);
 
     /// <summary>The width this button needs for its circle and its text, in pixels.</summary>
     internal int WidthNeeded()
     {
+        if (Sign == PillSign.None)
+        {
+            int plain = TextRenderer.MeasureText(Text, Font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width;
+            return plain + 2 * LogicalToDeviceUnits(RightPadding);
+        }
+
         using Font bold = BoldFont;
         int text = TextRenderer.MeasureText(Text, bold, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width;
         return Height + LogicalToDeviceUnits(TextGap - CircleMargin) + text + LogicalToDeviceUnits(RightPadding);
@@ -847,6 +915,19 @@ internal class PillButton : ShapedButton
             MaestroDrawing.FillShadow(g, path, shadow, 80);
             using var fill = new SolidBrush(Pressed ? Theme.TabIdle : Hover ? Theme.White : Theme.Pill);
             g.FillPath(fill, path);
+
+            if (Focused && ShowFocusCues)
+            {
+                using var ring = new Pen(Theme.ButtonNavy, 1.5f) { DashStyle = DashStyle.Dot };
+                g.DrawPath(ring, path);
+            }
+        }
+
+        if (Sign == PillSign.None)
+        {
+            TextRenderer.DrawText(g, Text, Font, Rectangle.Round(pill), Enabled ? Theme.ButtonNavy : Theme.DisabledText,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            return;
         }
 
         float margin = LogicalToDeviceUnits(CircleMargin);
@@ -857,8 +938,16 @@ internal class PillButton : ShapedButton
             g.FillEllipse(navy, circle);
         }
 
-        float icon = LogicalToDeviceUnits(IconHeight);
-        MaestroDrawing.DrawPrinterIcon(g, new RectangleF(circle.Left + (circle.Width - icon) / 2, circle.Top + (circle.Height - icon) / 2, icon, icon), Theme.White);
+        if (Sign == PillSign.Tick)
+        {
+            float tick = diameter * 0.5f; // the tick of TsDssConverter's Save: half the circle
+            MaestroDrawing.DrawTick(g, new RectangleF(circle.Left + (circle.Width - tick) / 2, circle.Top + (circle.Height - tick) / 2, tick, tick), Theme.White);
+        }
+        else
+        {
+            float icon = LogicalToDeviceUnits(IconHeight);
+            MaestroDrawing.DrawPrinterIcon(g, new RectangleF(circle.Left + (circle.Width - icon) / 2, circle.Top + (circle.Height - icon) / 2, icon, icon), Theme.White);
+        }
 
         using Font bold = BoldFont;
         int textLeft = (int)(circle.Right + LogicalToDeviceUnits(TextGap));

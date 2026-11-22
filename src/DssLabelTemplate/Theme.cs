@@ -186,6 +186,13 @@ internal static class Theme
     /// </summary>
     public static readonly Color BusyShade = ColorTranslator.FromHtml("#808080");
 
+    /// <summary>
+    /// Over the window while the Magic parameters popup is open (2.0.1, Daan, the same as TsDssConverter 2.0.1): the window
+    /// stays sharp under this see-through navy (ButtonNavy at 35%). The popup itself is WorkArea, the dark grey of the bar.
+    /// </summary>
+    public static readonly Color DimLayer = Color.FromArgb(89, 0x0B, 0x2C, 0x6B);
+    public static readonly Color PopupShadow = Color.FromArgb(90, 0, 0, 0); // the soft shadow under the popup
+
     public static readonly Color XmlTag = DarkBlue;         // <PrintLabel>, </Text>, the < > and /> around them (bold)
     public static readonly Color XmlAttributeName = DarkBlue; // X=, FontSize=
     public static readonly Color XmlValue = Navy;            // "70", "BARCODE128A" (on a very pale blue)

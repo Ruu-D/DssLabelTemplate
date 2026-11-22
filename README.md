@@ -6,8 +6,9 @@ DssLabelTemplate is a small Windows tool for the label files of a Duivestein war
 printed, shows where it sits on the sheet, lets you edit the label layout, and reprints a damaged label at the unloading belt.
 Sister tool: **[TsDssConverter](https://github.com/Ruu-D/TsDssConverter)** (writes the label CSV files for the warehouse).
 
-> **Status:** version **2.0.0** (2026-11-21), the first customer release in the new look. Printing on the reprint printer
-> (Zebra ZD220) works; real-world use at the customer is going on. Full history: [CHANGELOG.md](CHANGELOG.md).
+> **Status:** version **2.0.1** (2026-11-22): the advanced settings can now be changed in the window, in the *Magic
+> parameters* (see below); 2.0.0 (2026-11-21) was the first customer release in the new look. Printing on the reprint
+> printer (Zebra ZD220) works; real-world use at the customer is going on. Full history: [CHANGELOG.md](CHANGELOG.md).
 
 ## At a glance
 
@@ -59,12 +60,16 @@ tapping another label shows that one:
 | 1.1.5 | 2026-11-08 | `settings.json` can be edited while the program runs (see below) |
 | 1.2.0 | 2026-11-08 | **Board view** with tap-to-show, bigger touch buttons, adjustable CSV table size |
 | 2.0.0 | 2026-11-21 | **New look** ("Maestro" skin, like the SCM machine software the operators use), own title bar with clock, F11 full screen, foldable file lines; the same functions |
+| 2.0.1 | 2026-11-22 | *Magic parameters*: the advanced settings in a popup behind a cog, so nobody has to edit `settings.json` |
 
-## Settings that are only in `settings.json`
+## Advanced settings (*Magic parameters*)
 
-The language and the label size are set in the window. Other settings are only in `C:\DssLabelTemplate\settings.json`:
-**Shift+click on the ROGIERS logo** (top right of the window, next to the "?") opens it in Notepad. A saved change is used as soon as you
-click back into the window, and is never overwritten by the program. The `README.md` in that folder explains each one.
+The language and the label size are set in the window. The other settings are stored in
+`C:\DssLabelTemplate\settings.json`. Since 2.0.1 the **cog** at the top right of the window (next to the "?") opens all
+of them except `PrinterName` in a popup, the *Magic parameters* (the window behind it is dimmed), so nobody has to edit the
+file; the popup changes only these values in the file and they are used at once. `PrinterName` is set by printing once
+with the Windows print dialog. The file can still be edited by hand (up to 2.0.0: Shift+click on the ROGIERS logo); a
+change is used as soon as you click back into the window. The `README.md` in that folder explains each setting.
 
 | Setting | Default | Meaning |
 |---|---|---|

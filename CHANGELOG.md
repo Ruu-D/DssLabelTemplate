@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.0.1 — 2026-11-22 — the Magic parameters
+
+- Daan decided the customer must be able to change the hidden settings without editing `settings.json`, the same as in
+  TsDssConverter 2.0.1. From his mockup (claude.ai Design "DssLabelTemplate Magic parameters",
+  https://claude.ai/artifact/LrgzuUGFasuXu4aU3CoCJa); he chose to show all eight settings that are not in the window, and
+  asked that the popup is at most 2/3 of the window's height, the rest scrolling inside the list.
+- A **cog** right of the "?" in the top bar (`MagicParametersButton`, the same flat grey disc, `DiscGlyph.Cog`) opens the
+  **Magic parameters** (new file `MagicParameters.cs`), in three groups: Weergave (`SheetRotationInViewer`,
+  `ShowLabelRotation`, `ShowBoardByDefault`, `RowHeightCSV`), Afdrukken (`PrintLabelWithRotation`,
+  `HideWindowsPrintDialog`), Machine (`LabelDirection`, `SheetReferenceCorner`). True/false settings are check boxes in the
+  right column; each row shows its settings.json key in a small tag. Styling identical to TsDssConverter 2.0.1: the dark
+  grey card with rounded corners, the white rounded panel, smaller Annuleren / Opslaan pills, the window behind it sharp
+  under navy at 35%. Enter = Opslaan, Esc = Annuleren; the window's own buttons and shortcuts do nothing meanwhile.
+- Opslaan changes ONLY those eight values in settings.json (`SettingsStore.SaveHandEditedSettings`: read again, change,
+  write; a file with a mistake is not overwritten) and uses them at once.
+- The hidden **Shift+click on the ROGIERS logo is removed** (a normal click still opens rogiers.be). settings.json can still
+  be edited by hand; a change is used when the window is active again.
+- `PillButton.Sign` (Printer / Tick / None) for Save and Cancel; `FluentCheckBox` restyled navy (it was not used yet);
+  `TextBoxFrame` also takes a `NumericUpDown`. `program-folder\README.md` and the README explain the cog.
+- Tests: 265 (was 244). Rendered at a real 150% in three languages; 125% not seen.
+- Delivery file: `dist\v2.0.1\DssLabelTemplate.exe`, 54,589,508 bytes, file version 2.0.1.0, SHA-256
+  `e268c2fedc424bfb3e585a1e875effb0720b185dc07afd426083f94f9c4d15d5`, built by `publish.cmd` after all 265 tests passed
+  (run with `MSBUILDDISABLENODEREUSE=1`: a lingering MSBuild node made the restore hang). Started once with a scratch data
+  folder and the 60x60 sample: it opened the file, wrote the data folder, and closed.
+
 ## Open points — 2026-11-22 (docs only, Daan, no new version)
 
 - **Resolved:** scanning the printed QR code and barcode with the real scanner works (tested 2026-11-20).

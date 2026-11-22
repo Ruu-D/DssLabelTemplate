@@ -79,6 +79,53 @@ public class SettingsTests
     }
 
     [Fact]
+    public void SaveHandEditedSettings_ChangesOnlyTheSettingsThatAreNotInTheWindow_AndKeepsTheRestOfTheFile()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+        Directory.CreateDirectory(folder.Path);
+
+        // In the file: window settings that differ from the ones in use (edited elsewhere meanwhile).
+        SettingsStore.Save(path, new AppSettings { Language = "en", LabelLength = 60, LastFile = @"C:\x.xml" });
+
+        // The popup changes every one of its settings (values that differ from the defaults), and also, by mistake, a
+        // window setting: that one must NOT reach the file.
+        var fromPopup = new AppSettings
+        {
+            SheetRotationInViewer = 90, ShowLabelRotation = true, PrintLabelWithRotation = true, HideWindowsPrintDialog = true,
+            LabelDirection = AppSettings.Clockwise, SheetReferenceCorner = "Rechtsonder", ShowBoardByDefault = true, RowHeightCSV = 250,
+            Language = "fr",
+        };
+        SettingsStore.SaveHandEditedSettings(path, new AppSettings(), fromPopup);
+
+        AppSettings read = SettingsStore.Load(path);
+        Assert.True(read.HasSameHandEditedSettings(fromPopup));
+        foreach (string name in HandEditedSettings)
+        {
+            var property = typeof(AppSettings).GetProperty(name)!;
+            Assert.NotEqual(property.GetValue(new AppSettings()), property.GetValue(read)); // the test itself changes every one
+        }
+
+        Assert.Equal("en", read.Language);
+        Assert.Equal(60, read.LabelLength);
+        Assert.Equal(@"C:\x.xml", read.LastFile);
+    }
+
+    [Fact]
+    public void SaveHandEditedSettings_NeverOverwritesAFileWithAMistake()
+    {
+        using var folder = new TempFolder();
+        string path = folder.File("settings.json");
+        Directory.CreateDirectory(folder.Path);
+        File.WriteAllText(path, "{ \"Language\": \"nl\", oops }");
+
+        var error = Assert.Throws<IOException>(() => SettingsStore.SaveHandEditedSettings(path, new AppSettings(), new AppSettings { RowHeightCSV = 200 }));
+
+        Assert.Contains("settings.json", error.Message);
+        Assert.Equal("{ \"Language\": \"nl\", oops }", File.ReadAllText(path)); // untouched
+    }
+
+    [Fact]
     public void SaveKeepingHandEdits_TakesTheWindowsSettings_AndKeepsWhatWasEditedByHandInTheFile()
     {
         using var folder = new TempFolder();

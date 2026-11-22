@@ -151,10 +151,12 @@ internal class AppSettings
     }
 
     /// <summary>
-    /// Takes the settings that are ONLY in settings.json (edited by hand, not in the window) from <paramref name="file"/>.
-    /// Used when saving and when the file was edited while the program runs: settings.json wins for these, the window
-    /// for all the others. A new hidden setting must be added here and in <see cref="HasSameHandEditedSettings"/> (a test
-    /// checks that every setting is either here or known as a setting of the window).
+    /// Takes the settings that are not in the window itself from <paramref name="file"/>: since 2.0.1 they are changed in
+    /// the "Magic parameters" popup (the cog at the top right, MagicParameters.cs) or by hand in settings.json. Used when
+    /// saving, when the file was edited while the program runs, and when the popup is saved: settings.json wins for these,
+    /// the window for all the others. A new such setting must be added here, in <see cref="HasSameHandEditedSettings"/> and
+    /// as a row of the popup (tests check that every setting is either here or known as a setting of the window, and that
+    /// the popup has a row for each of these).
     /// </summary>
     public void CopyHandEditedSettingsFrom(AppSettings file)
     {
@@ -253,8 +255,8 @@ internal static class SettingsStore
     }
 
     /// <summary>
-    /// Saves the settings of the window WITHOUT losing what someone edited by hand in settings.json meanwhile (in Notepad,
-    /// Shift+click on the logo): the file is read again first, and the settings that are only edited by hand are taken
+    /// Saves the settings of the window WITHOUT losing what was changed in settings.json meanwhile (in the Magic parameters
+    /// popup, or by hand in Notepad): the file is read again first, and the settings that are not in the window are taken
     /// from it (<see cref="AppSettings.CopyHandEditedSettingsFrom"/>). A file with a mistake, or one that cannot be read
     /// right now, is NOT overwritten: then nothing is saved and false is returned (the program saves often, a message
     /// every time would only be in the way). May throw IOException when writing fails.
@@ -276,6 +278,28 @@ internal static class SettingsStore
 
         Save(path, toSave);
         return true;
+    }
+
+    /// <summary>
+    /// Saves the values of the "Magic parameters" popup (2.0.1): settings.json is read again first and ONLY the settings
+    /// that are not in the window are changed (<see cref="AppSettings.CopyHandEditedSettingsFrom"/>); everything else in
+    /// the file stays as it is. No file: the settings in use are written with the popup's values. A file with a mistake
+    /// (or one that cannot be read right now) is NOT overwritten: then an IOException with a message for the user is
+    /// thrown, like a failed write.
+    /// </summary>
+    /// <returns>What was written.</returns>
+    public static AppSettings SaveHandEditedSettings(string path, AppSettings inUse, AppSettings fromPopup)
+    {
+        SettingsReadResult onDisk = Read(path);
+        if (onDisk.Error != "")
+        {
+            throw new IOException(Strings.SettingsFileNotOverwritten(path, onDisk.Error));
+        }
+
+        AppSettings toSave = onDisk.FileExisted ? onDisk.Settings.Clone() : inUse.Clone();
+        toSave.CopyHandEditedSettingsFrom(fromPopup);
+        Save(path, toSave);
+        return toSave;
     }
 
     /// <summary>Reads settings.json and says whether that worked. Never throws.</summary>

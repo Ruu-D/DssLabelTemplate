@@ -273,6 +273,98 @@ internal static class Strings
         $"Les paramètres n'ont pas pu être enregistrés : {reason}",
         $"The settings could not be saved: {reason}");
 
+    /// <summary>Saving the Magic parameters: settings.json has a mistake, so it is not overwritten.</summary>
+    public static string SettingsFileNotOverwritten(string path, string reason) => T(
+        $"settings.json bevat een fout ({reason}) en wordt niet overschreven. Verbeter eerst het bestand: {path}",
+        $"settings.json contient une erreur ({reason}) et n'est pas écrasé. Corrigez d'abord le fichier : {path}",
+        $"settings.json contains a mistake ({reason}) and is not overwritten. Fix the file first: {path}");
+
+    // ---- The "Magic parameters" popup (2.0.1, Daan): the settings that are not in the window itself ----
+    // The title is the same in every language (Daan's name for it, as in TsDssConverter).
+    public const string MagicParametersTitle = "Magic parameters";
+
+    /// <summary>The tooltip of the cog at the top right that opens the popup.</summary>
+    public static string MagicParametersTooltip => T(
+        "Magic parameters (geavanceerde instellingen)",
+        "Magic parameters (paramètres avancés)",
+        "Magic parameters (advanced settings)");
+
+    // The three groups of the popup (written in capitals on the panel).
+    public static string GroupDisplay => T("WEERGAVE", "AFFICHAGE", "DISPLAY");
+    public static string GroupPrinting => T("AFDRUKKEN", "IMPRESSION", "PRINTING");
+    public static string GroupMachine => T(
+        "MACHINE (zelfde als DSSClient en TsDssConverter)",
+        "MACHINE (comme DSSClient et TsDssConverter)",
+        "MACHINE (the same as DSSClient and TsDssConverter)");
+
+    public static string SheetRotationCaption => T(
+        "Draaiing van de plaat in de viewer", "Rotation du panneau dans l'aperçu", "Rotation of the sheet in the viewer");
+    public static string SheetRotationHint => T(
+        "Draait de plaat onder het label, als de label-PC vanaf een andere kant naar de machine kijkt.",
+        "Tourne le panneau sous l'étiquette, si le PC d'étiquetage regarde la machine d'un autre côté.",
+        "Turns the sheet below the label, when the label PC looks at the machine from another side.");
+    public static string RotationNone => T("0° (niet gedraaid)", "0° (pas tourné)", "0° (not turned)");
+    public static string RotationLeft90 => T("90° tegen de klok in", "90° sens antihoraire", "90° counter-clockwise");
+    public const string Rotation180 = "180°";
+    public static string RotationRight90 => T("90° met de klok mee", "90° sens horaire", "90° clockwise");
+
+    public static string ShowLabelRotationCaption => T(
+        "Label gedraaid tonen in de preview", "Étiquette tournée dans l'aperçu", "Label turned in the preview");
+    public static string ShowLabelRotationHint => T(
+        "Aan: zoals het op de plaat ligt (ROTATION uit de CSV). Uit: rechtop, zoals het geprint wordt.",
+        "Activé : comme sur le panneau (ROTATION du CSV). Désactivé : droite, comme imprimée.",
+        "On: as it lies on the sheet (ROTATION from the CSV). Off: upright, as it is printed.");
+
+    public static string ShowBoardCaption => T("Bord standaard tonen", "Afficher le plateau par défaut", "Show the board by default");
+    public static string ShowBoardHint => T(
+        "Aan: elk geopend bestand toont meteen het bord met alle labelposities.",
+        "Activé : chaque fichier ouvert affiche tout de suite le plateau avec toutes les positions d'étiquettes.",
+        "On: every opened file shows the board with all label positions at once.");
+
+    public static string CsvSizeCaption => T("Grootte van de CSV-tabel", "Taille du tableau CSV", "Size of the CSV table");
+    public static string CsvSizeHint => T(
+        $"Rijen en tekst van de tabel, om op afstand te lezen ({AppSettings.MinimumCsvRowSize} – {AppSettings.MaximumCsvRowSize} %).",
+        $"Lignes et texte du tableau, pour lire à distance ({AppSettings.MinimumCsvRowSize} – {AppSettings.MaximumCsvRowSize} %).",
+        $"Rows and text of the table, for reading at a distance ({AppSettings.MinimumCsvRowSize} – {AppSettings.MaximumCsvRowSize} %).");
+
+    public static string PrintRotationCaption => T("Label gedraaid afdrukken", "Imprimer l'étiquette tournée", "Print the label turned");
+    public static string PrintRotationHint => T(
+        "Aan: de print draait mee met ROTATION. Werkt alleen voor een vierkant label.",
+        "Activé : l'impression tourne avec ROTATION. Seulement pour une étiquette carrée.",
+        "On: the print turns with ROTATION. Only works for a square label.");
+
+    public static string HidePrintDialogCaption => T(
+        "Zonder Windows-printvenster afdrukken", "Imprimer sans la fenêtre d'impression Windows", "Print without the Windows print dialog");
+    public static string HidePrintDialogHint => T(
+        "Aan: Print drukt meteen af op de laatst gekozen printer (of de standaardprinter).",
+        "Activé : Imprimer imprime tout de suite sur la dernière imprimante choisie (ou celle par défaut).",
+        "On: Print prints at once on the printer chosen last (or the default printer).");
+
+    public static string LabelDirectionCaption => T("Draairichting van het label", "Sens de rotation de l'étiquette", "Turning direction of the label");
+    public static string LabelDirectionHint => T(
+        "Naar welke kant een positieve ROTATION het label draait. Te controleren met een label op 90°.",
+        "Le sens dans lequel une ROTATION positive tourne l'étiquette. À vérifier avec une étiquette à 90°.",
+        "Which way a positive ROTATION turns the label. To check with a label at 90°.");
+    public static string DirectionCounterClockwise => T("Tegen de klok in (CCW)", "Sens antihoraire (CCW)", "Counter-clockwise (CCW)");
+    public static string DirectionClockwise => T("Met de klok mee (CW)", "Sens horaire (CW)", "Clockwise (CW)");
+
+    public static string ReferenceCornerCaption => T("Nulpunt van de plaat", "Point zéro du panneau", "Zero point of the sheet");
+    public static string ReferenceCornerHint => T(
+        "Dezelfde hoek als in DSSClient en TsDssConverter, anders staan de labels gespiegeld op het bord.",
+        "Le même coin que dans DSSClient et TsDssConverter, sinon les étiquettes sont en miroir sur le plateau.",
+        "The same corner as in DSSClient and TsDssConverter, otherwise the labels are mirrored on the board.");
+
+    /// <summary>The four corners, with DSSClient's own (Dutch) names in every language: the customer picks the same word there.</summary>
+    public const string CornerBottomLeft = "Linksonder";
+    public const string CornerTopLeft = "Linksboven";
+    public const string CornerBottomRight = "Rechtsonder";
+    public const string CornerTopRight = "Rechtsboven";
+
+    /// <summary>Above the path of settings.json at the bottom left of the popup.</summary>
+    public static string SavedIn => T("Wordt bewaard in", "Enregistré dans", "Saved in");
+    public static string Save => T("Opslaan", "Enregistrer", "Save");
+    public static string Cancel => T("Annuleren", "Annuler", "Cancel");
+
     /// <summary>Before printing: the page of the printer driver is not the label size of the window.</summary>
     public static string PaperSizeQuestion(string printer, string paperLength, string paperWidth, string labelLength, string labelWidth) => T(
         $"Het papier van printer {printer} is {paperLength} × {paperWidth} mm, het label is {labelLength} × {labelWidth} mm. " +

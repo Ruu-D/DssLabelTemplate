@@ -8,10 +8,10 @@ The main application, **DssLabelTemplate.exe**, can be used to:
 
 # Remarks - Settings
 
-There are several hidden parameters available in the **settings.json** file:
+There are several advanced parameters in the **settings.json** file:
 
-- **Shift + click on the ROGIERS logo** (top right of the window, next to the round "?") opens settings.json in Notepad. A normal click opens the website.
-- Save the file in Notepad, then click back into the DssLabelTemplate window: the new values are used at once, no restart needed.
+- Since version 2.0.1 the **cog** at the top right of the window (right of the round "?") opens them in the **Magic parameters**: change them there and press Save. Only those values are changed in settings.json, and they are used at once. (`PrinterName` is not in it: print once with the Windows print dialog to choose the printer.)
+- The file can still be edited by hand in Notepad: save it, then click back into the DssLabelTemplate window: the new values are used at once, no restart needed.
 - The program never overwrites your changes when it saves its own settings (window position, language, ...).
 - If the file contains a mistake, a message tells you so: the previous settings stay in use and the file is not overwritten until it is fixed.
 

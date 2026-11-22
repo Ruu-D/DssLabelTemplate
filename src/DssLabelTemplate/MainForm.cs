@@ -27,6 +27,10 @@ internal class MainForm : Form
     private readonly string? _dataFolder; // C:\DssLabelTemplate: the Browse dialogs start in its example folders
     private DateTime _settingsFileTime;   // the date of settings.json when it was last read (see OnActivated)
 
+    // The "Magic parameters" over the window while they are open (null when closed), see MagicParameters.cs.
+    private DimOverlay? _dim;
+    private FormWindowState _lastWindowState;
+
     // The size of the window when it opens, at 100%. Wider than the 940 x 780 of 1.x: the top bar holds the title tab, the
     // language, the credit, the logo, the user guide, the clock and the window buttons on one line.
     private const int WindowWidth = 1180;
@@ -97,6 +101,7 @@ internal class MainForm : Form
     internal readonly Label CreditLabel = new();
     internal readonly Label VersionLabel = new();
     internal readonly DiscButton UserGuideButton = new(); // the round navy "?" at the top right: opens the user guide
+    internal readonly DiscButton MagicParametersButton = new(); // the cog right of the "?": opens the Magic parameters (2.0.1)
     internal readonly ClockDisplay Clock = new();         // the time, at the top right (like Maestro)
     internal readonly WindowButton MinimizeButton = new() { Kind = WindowButtonKind.Minimize }; // the window has no Windows title bar:
     internal readonly WindowButton MaximizeButton = new() { Kind = WindowButtonKind.Maximize }; // its three buttons are in the top bar
@@ -299,7 +304,7 @@ internal class MainForm : Form
         TopBar.BackColor = Theme.TopBar;
         TopBar.Padding = new Padding(0, 0, PanelGap, 0);
         TopBar.Margin = new Padding(0);
-        TopBar.ColumnCount = 11;
+        TopBar.ColumnCount = 12;
         TopBar.RowCount = 1;
         TopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (int i = 1; i < TopBar.ColumnCount; i++)
@@ -314,11 +319,12 @@ internal class MainForm : Form
         TopBar.Controls.Add(BuildCredits(), 3, 0);
         TopBar.Controls.Add(BuildLogo(), 4, 0);
         TopBar.Controls.Add(BuildUserGuideButton(), 5, 0);
-        TopBar.Controls.Add(Separator(), 6, 0);
-        TopBar.Controls.Add(BuildClock(), 7, 0);
-        TopBar.Controls.Add(MinimizeButton, 8, 0);
-        TopBar.Controls.Add(MaximizeButton, 9, 0);
-        TopBar.Controls.Add(CloseButton, 10, 0);
+        TopBar.Controls.Add(BuildMagicParametersButton(), 6, 0);
+        TopBar.Controls.Add(Separator(), 7, 0);
+        TopBar.Controls.Add(BuildClock(), 8, 0);
+        TopBar.Controls.Add(MinimizeButton, 9, 0);
+        TopBar.Controls.Add(MaximizeButton, 10, 0);
+        TopBar.Controls.Add(CloseButton, 11, 0);
 
         foreach (WindowButton button in new[] { MinimizeButton, MaximizeButton, CloseButton })
         {
@@ -484,6 +490,32 @@ internal class MainForm : Form
         }
 
         MaximizeButton.Maximised = maximised;
+
+        // Maximised or restored while the Magic parameters are open: a new picture for the dim layer. (While the edge is
+        // being dragged the old one is stretched; OnResizeEnd takes a new one, so it is not taken many times a second.)
+        if (WindowState != _lastWindowState)
+        {
+            _lastWindowState = WindowState;
+            if (WindowState != FormWindowState.Minimized)
+            {
+                _dim?.RefreshBackdrop();
+            }
+        }
+    }
+
+    protected override void OnResizeEnd(EventArgs e)
+    {
+        base.OnResizeEnd(e);
+        _dim?.RefreshBackdrop();
+    }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        if (_dim != null)
+        {
+            BeginInvoke(() => _dim?.RefreshBackdrop()); // after WinForms has scaled the window to the other monitor
+        }
     }
 
     /// <summary>
@@ -614,6 +646,18 @@ internal class MainForm : Form
         UserGuideButton.Margin = new Padding(8, 0, 0, 0);
         UserGuideButton.Click += (sender, e) => OpenWebsite(Strings.UserGuideUrl);
         return UserGuideButton;
+    }
+
+    /// <summary>The cog right of the "?" (2.0.1, Daan): opens the Magic parameters. The same flat grey disc as the "?".</summary>
+    private Control BuildMagicParametersButton()
+    {
+        MagicParametersButton.Flat = true;
+        MagicParametersButton.Glyph = DiscGlyph.Cog;
+        MagicParametersButton.Size = UserGuideSize;
+        MagicParametersButton.Anchor = AnchorStyles.Left;
+        MagicParametersButton.Margin = new Padding(4, 0, 0, 0);
+        MagicParametersButton.Click += (sender, e) => OpenMagicParameters();
+        return MagicParametersButton;
     }
 
     /// <summary>
@@ -1613,8 +1657,8 @@ internal class MainForm : Form
     }
 
     /// <summary>
-    /// The ROGIERS logo in the top bar (Daan's mockup; it was at the bottom left in 1.x): opens rogiers.be, Shift+click
-    /// opens settings.json (<see cref="LogoClicked"/>).
+    /// The ROGIERS logo in the top bar (Daan's mockup; it was at the bottom left in 1.x): opens rogiers.be. (The hidden
+    /// Shift+click to settings.json of 1.1.5 – 2.0.0 is gone since the Magic parameters, 2.0.1, Daan.)
     /// </summary>
     private Control BuildLogo()
     {
@@ -1626,43 +1670,128 @@ internal class MainForm : Form
         LogoPicture.Margin = new Padding(16, 0, 0, 0);
         LogoPicture.Cursor = Cursors.Hand;
         _toolTip.SetToolTip(LogoPicture, Strings.CompanyName);
-        LogoPicture.Click += (sender, e) => LogoClicked(shiftDown: (ModifierKeys & Keys.Shift) == Keys.Shift);
+        LogoPicture.Click += (sender, e) => OpenWebsite(Strings.CompanyUrl);
         return LogoPicture;
     }
 
+    // ------------------------------------------------------------------ the Magic parameters
+
+    /// <summary>The popup while it is open, else null (the tests look at it).</summary>
+    internal MagicParametersPopup? MagicParameters => _dim?.Popup;
+
+    // The parts of the window that the dim layer covers and that are switched off meanwhile (taken when it opens).
+    private Control[] _coveredParts = Array.Empty<Control>();
+
     /// <summary>
-    /// A click on the logo opens the website. Shift+click opens settings.json in Notepad instead (Daan, 2026-11-08): a
-    /// hidden way in for whoever maintains the program, because several settings are only in that file. It is not shown
-    /// anywhere on purpose. A change in the file is used when the window is active again (<see cref="OnActivated"/>).
+    /// The cog: opens the Magic parameters over the window (MagicParameters.cs). First a picture is taken of the window as
+    /// it is, for the dim layer; then the window's own controls are switched off, so neither the mouse nor the Tab key can
+    /// reach them, and Enter / Esc belong to the popup (Enter = Save, Esc = Cancel).
     /// </summary>
-    internal void LogoClicked(bool shiftDown)
+    internal void OpenMagicParameters()
     {
-        if (!shiftDown)
+        if (_dim != null)
         {
-            OpenWebsite(Strings.CompanyUrl);
             return;
         }
 
+        string settingsFile = SettingsFilePath ?? AppDataFolder.SettingsFile(AppDataFolder.DefaultRoot);
+        var popup = new MagicParametersPopup(_settings, settingsFile, Font, SaveMagicParameters, CloseMagicParameters);
+        _coveredParts = Controls.Cast<Control>().ToArray(); // the top bar, the panels, the bottom bar
+        _dim = new DimOverlay(popup, TakePicture)
+        {
+            Bounds = ClientRectangle,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom,
+        };
+        _dim.RefreshBackdrop(); // the picture of the window, before anything is switched off
+
+        foreach (Control part in _coveredParts)
+        {
+            part.Enabled = false;
+        }
+
+        AcceptButton = popup.SavePill;
+        CancelButton = popup.CancelPill;
+
+        Controls.Add(_dim);
+        _dim.BringToFront();
+        popup.SheetRotationBox.Select();
+    }
+
+    /// <summary>Closes the popup (Cancel, Esc, or after Save) and gives the window back.</summary>
+    internal void CloseMagicParameters()
+    {
+        if (_dim == null)
+        {
+            return;
+        }
+
+        DimOverlay overlay = _dim;
+        _dim = null;
+        foreach (Control part in _coveredParts)
+        {
+            part.Enabled = true;
+        }
+
+        _coveredParts = Array.Empty<Control>();
+        AcceptButton = null; // the window has no Enter / Esc button of its own (Enter in a path box opens the file)
+        CancelButton = null;
+        Controls.Remove(overlay);
+
+        // Disposed a moment later: this can be running inside the click of one of its own pills.
+        if (IsHandleCreated)
+        {
+            BeginInvoke(overlay.Dispose);
+        }
+        else
+        {
+            overlay.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Save in the popup: only its values are changed in settings.json (the file is read again first, the rest of it stays
+    /// as it is) and used at once (the sheet map, the preview, the table, the print button). False when that failed: the
+    /// user is told and the popup stays open.
+    /// </summary>
+    private bool SaveMagicParameters(AppSettings values)
+    {
         string? path = SettingsFilePath;
-        if (path == null)
+        if (path != null) // null in the tests: no data folder, only used
         {
-            return; // tests: no data folder
-        }
-
-        try
-        {
-            if (!File.Exists(path))
+            try
             {
-                SettingsStore.Save(path, _settings); // someone deleted it: write the settings in use, so there is something to edit
+                SettingsStore.SaveHandEditedSettings(path, _settings, values);
+                _settingsFileTime = File.GetLastWriteTimeUtc(path); // our own change: OnActivated has nothing to read again
             }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            {
+                MessageBox.Show(this, Strings.SettingsSaveFailed(error.Message), Strings.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+        }
 
-            // Always Notepad: Windows often has no program for .json, or opens it in a browser where it cannot be edited.
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe") { ArgumentList = { path }, UseShellExecute = false });
-        }
-        catch (Exception error) when (error is System.ComponentModel.Win32Exception || error is IOException || error is UnauthorizedAccessException)
+        UseHandEditedSettings(values);
+        return true;
+    }
+
+    /// <summary>A picture of the window's inside as it is now (the top bar, the panels, the bottom bar), for the dim layer.</summary>
+    private Bitmap TakePicture()
+    {
+        var picture = new Bitmap(Math.Max(1, ClientSize.Width), Math.Max(1, ClientSize.Height));
+        using (Graphics g = Graphics.FromImage(picture))
         {
-            MessageBox.Show(this, Strings.CannotOpenFile(error.Message), Strings.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            g.Clear(BackColor); // the resize edge around the panels
         }
+
+        foreach (Control part in _coveredParts)
+        {
+            if (part.Visible && part.Width > 0 && part.Height > 0)
+            {
+                part.DrawToBitmap(picture, part.Bounds);
+            }
+        }
+
+        return picture;
     }
 
     /// <summary>C:\DssLabelTemplate\settings.json; null when the window has no data folder (the tests).</summary>
@@ -2345,6 +2474,12 @@ internal class MainForm : Form
     /// <summary>Ctrl+S saves, Ctrl+O opens, Ctrl+P prints (as in Notepad).</summary>
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        // While the Magic parameters are open the window behind them is off: its shortcuts do nothing.
+        if (_dim != null && keyData is (Keys.Control | Keys.S) or (Keys.Control | Keys.P) or (Keys.Control | Keys.O) or Keys.F11)
+        {
+            return true;
+        }
+
         if (keyData == (Keys.Control | Keys.S))
         {
             SaveFile();
