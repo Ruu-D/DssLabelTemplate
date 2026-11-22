@@ -1,5 +1,13 @@
 # Changelog
 
+## Open points — 2026-11-22 (docs only, Daan, no new version)
+
+- **Resolved:** scanning the printed QR code and barcode with the real scanner works (tested 2026-11-20).
+- **Removed:** "the real label templates of the working system" is no longer an open point.
+- **Still open:** the real label size and a printed label to compare the preview with (position point, rotation
+  direction); still to test how Duivestein's PrintServer interprets some elements on the label.
+- README *Open points* and CLAUDE.md §10 updated. No code change.
+
 ## README banner in the Maestro blues — 2026-11-21 (Daan, no new version)
 
 - `media/header.png` (the README header) is now drawn on the vertical gradient of the bottom bar (`Theme.BarTop` →

@@ -87,11 +87,10 @@ click back into the window, and is never overwritten by the program. The `README
 
 ## Open points
 
-| From | Question |
-|---|---|
-| Customer | The real label size and a printed label to compare the preview with (position point, rotation direction) |
-| Duivestein | The real label templates of the working system |
-| Reprint station | Scanning the printed QR code and barcode with the real scanner |
+| From | Question | Status |
+|---|---|---|
+| Customer | The real label size and a printed label to compare the preview with (position point, rotation direction). Still to test: how Duivestein's PrintServer interprets some elements on the label. | **Open** |
+| Reprint station | Scanning the printed QR code and barcode with the real scanner | **Resolved** (tested 2026-11-20): works |
 
 ## Technology
 
